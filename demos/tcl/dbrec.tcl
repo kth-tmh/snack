@@ -4,7 +4,7 @@ exec wish8.3 "$0" "$@"
 
 # Prompted sentence recording application
  
-package require -exact snack 2.0
+package require -exact snack 2.1
 
 set rate 16000
 snack::sound t -rate $rate
@@ -66,11 +66,13 @@ label .f1.level -textvariable level
 
 frame .f1.f
 grid [frame .f1.f.g]
-grid [label .f1.f.g.lc -text <Space>=Play -relief raised -bd 3] -row 2 -col 1 -padx 20
-grid [label .f1.f.g.lu -text <Up>=Record -relief raised -bd 3] -row 1 -col 3
-grid [label .f1.f.g.ll -text <Left>=Prev -relief raised -bd 3] -row 2 -col 2
-grid [label .f1.f.g.ld -text <Down>=Stop -relief raised -bd 3] -row 2 -col 3
-grid [label .f1.f.g.lr -text <Right>=Next -relief raised -bd 3] -row 2 -col 4
+grid [label .f1.f.g.lc -text <Space>=Play -relief raised -bd 3] -row 2 \
+  -column 1 -padx 20
+grid [label .f1.f.g.lu -text <Up>=Record -relief raised -bd 3] -row 1 -column 3
+grid [label .f1.f.g.ll -text <Left>=Prev -relief raised -bd 3] -row 2 -column 2
+grid [label .f1.f.g.ld -text <Down>=Stop -relief raised -bd 3] -row 2 -column 3
+grid [label .f1.f.g.lr -text <Right>=Next -relief raised -bd 3] -row 2 \
+  -column 4
 
 pack .f1.bp .f1.br .f1.pr .f1.ne .f1.be .f1.time .f1.lm .f1.level \
     .f1.f -side left
@@ -557,7 +559,7 @@ set ::script ""
 
 # Use session number specified on command line, otherwise use next slot
 
-if {$argv != ""} {
+if {[info exists argv] && $argv != ""} {
   if {[string match "-b" [lindex $argv 0]]} {
     OpenBrowser
     set argv [lreplace $argv 0 0]

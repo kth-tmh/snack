@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish8.3 "$0" "$@"
 
-package require -exact snack 2.0
+package require -exact snack 2.1
 
 set f [snack::filter echo 0.6 0.6 30 0.4 50 0.3]
 
@@ -46,9 +46,8 @@ proc Config {args} {
 }
 
 proc Play {} {
-  global f
   s stop
-  s play -filter $f
+  s play -filter $::f
 }
 
 proc Load {} {

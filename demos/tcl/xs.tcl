@@ -2,10 +2,10 @@
 # the next line restarts using wish \
 exec wish8.3 "$0" "$@"
 
-package require -exact snack 2.0
-catch {
-    package require snacksphere
-}
+package require -exact snack 2.1
+# Try to load optional file format handlers
+catch { package require snacksphere }
+catch { package require snackogg }
 package require http
 
 set debug 0
@@ -26,7 +26,7 @@ set local 0
 if $local {
     set v(labfmt) TIMIT
     set v(smpfmt) WAV
-    set v(ashost) datan.speech.kth.se
+    set v(ashost) ior.speech.kth.se
 } else {
     set v(labfmt) TIMIT
     set v(smpfmt) WAV
@@ -49,8 +49,8 @@ set v(vchan)   -1
 #set v(zerolabs) 0
 set v(startsmp) 0
 set v(lastmoved) -1
-set v(p_version) 2.0
-set v(s_version) 2.0
+set v(p_version) 2.1
+set v(s_version) 2.1
 set v(plugins) {}
 set v(scroll) 1
 set v(rate) 16000
@@ -80,26 +80,26 @@ set v(remspegh) 200
 set v(remote) 0
 set v(asport) 23654
 set v(handle) ""
+set v(s0) 0
 
 set z(zoomwinh) 200
 set z(zoomwinw) 600
+set z(zoomwinx) 200
+set z(zoomwiny) 200
 set z(zoomwavh) 0
 set z(zoomwavw) 0
 set z(f) 1
 
 set s(sectwinh) 400
 set s(sectwinw) 400
+set s(sectwinx) 200
+set s(sectwiny) 200
 set s(secth) 400
 set s(sectw) 400
 set s(rx) -1
-set s(fftlen) 512
-set s(anabw)  31.25
-set s(ref)    -110.0
-set s(range)  110.0
-set s(wintype) Hamming
 
 proc SetDefaultVars {} {
-    global f v local
+    global f v s local
 
     set v(waveh) 50
     set v(spegh) 0
@@ -131,8 +131,8 @@ proc SetDefaultVars {} {
 	    option add *font {Helvetica 12 bold}
 	}
     } else {
-	set v(printcmd)  {C:/gstools/gs5.50/gswin32 "-IC:\gstools\gs5.50;C:\gstools\gs5.50\fonts" -sDEVICE=laserjet -dNOPAUSE $FILE -c quit}
-	set v(gvcmd)     {C:/gstools/gsview/gsview32 $FILE}
+	set v(printcmd)  {C:/gs/gs6.50/bin/gswin32 "-IC:\gs\gs6.50;C:\gs\gs6.50\fonts" -sDEVICE=laserjet -dNOPAUSE $FILE -c quit}
+	set v(gvcmd)     {C:/ghostgum/gsview/gsview32 $FILE}
 	set v(psfilecmd) {command.com /c copy _xspr$n.ps $v(psfile)}
 	if $local {
 #	    set v(pluginfiles) {H:/tcl/mexd/dataplot.plg H:/tcl/mexd/generator.plg H:/tcl/mexd/pitch.plg}
@@ -165,6 +165,22 @@ proc SetDefaultVars {} {
     set f(ipath) ""
     set f(ihttp) "http://www.speech.kth.se/~kare/ex1.wav"
     #"http://www.speech.kth.se/cgi-bin/TransAll?this_is_an_example+am"
+
+    set s(fftlen) 512
+    set s(anabw)  31.25
+    set s(ref)    -110.0
+    set s(range)  110.0
+    set s(wintype) Hamming
+    set s(atype) FFT
+    set s(lpcorder) 20
+
+    if {[info exists snack::snackogg]} {
+      set ::ogg(nombr) 128000
+      set ::ogg(maxbr) -1
+      set ::ogg(minbr) -1
+      set ::ogg(com)   ""
+      set ::ogg(query) 1
+    }
 }
 
 SetDefaultVars
@@ -193,6 +209,8 @@ set normalize(f) [snack::filter map 1.0]
 set normalize(v) 100.0
 set normalize(db) 0
 set normalize(allEqual) 1
+
+set remdc(f) [snack::filter iir -numerator "0.99 -0.99" -denominator "1 -0.99"]
 
 set f(spath) $f(ipath)
 set f(http) $f(ihttp)
@@ -302,11 +320,15 @@ snack::menuCommand Transform {Mix Channels...} MixChan
 snack::menuCommand Transform Invert Invert
 snack::menuCommand Transform Reverse Reverse
 snack::menuCommand Transform Silence Silence
+snack::menuCommand Transform {Remove DC} RemoveDC
 
 snack::menuPane Tools
 
 snack::menuPane Options 0 ConfigOptionsMenu
 snack::menuCommand Options Settings... Settings
+if {[info exists snack::snackogg]} {
+  snack::menuCommand Options "Ogg Vorbis..." [list OggSettings Close]
+}
 snack::menuCommand Options Plug-ins... Plugins
 snack::menuCascade Options {Label File Format}
 snack::menuRadio {Label File Format} TIMIT v(labfmt) TIMIT {Redraw quick}
@@ -661,13 +683,57 @@ proc RecentFile fn {
     }
 }
 
-if [info exists snack::snacksphere] {
-    snack::addExtTypes {{SPHERE .sph} {SPHERE .wav} {TIMIT .phn} {MIX .smp.mix} {HTK .lab} {WAVES .lab}}
-    snack::addLoadTypes {{{SPHERE Files} {.sph}} {{SPHERE Files} {.wav}} {{MIX Files} {.mix}} {{HTK Label Files} {.lab}} {{TIMIT Label Files} {.phn}} {{TIMIT Label Files} {.wrd}} {{Waves Label Files} {.lab}}} {SPHERE SPHERE MIX HTK TIMIT WAVES}
-} else {
-    snack::addExtTypes {{TIMIT .phn} {MIX .smp.mix} {HTK .lab} {WAVES .lab}}
-    snack::addLoadTypes {{{MIX Files} {.mix}} {{HTK Label Files} {.lab}} {{TIMIT Label Files} {.phn}} {{TIMIT Label Files} {.wrd}} {{Waves Label Files} {.lab}}} {MIX HTK TIMIT WAVES}
+set extTypes  [list {TIMIT .phn} {MIX .smp.mix} {HTK .lab} {WAVES .lab}]
+set loadTypes [list {{MIX Files} {.mix}} {{HTK Label Files} {.lab}} {{TIMIT Label Files} {.phn}} {{TIMIT Label Files} {.wrd}} {{Waves Label Files} {.lab}}]
+set loadKeys [list MIX HTK TIMIT WAVES]
+set saveTypes {}
+set saveKeys  {}
+
+if {[info exists snack::snacksphere]} {
+    lappend extTypes {SPHERE .sph} {SPHERE .wav}
+    lappend loadTypes {{SPHERE Files} {.sph}} {{SPHERE Files} {.wav}}
+    lappend loadKeys SPHERE SPHERE
 }
+if {[info exists snack::snackogg]} {
+  lappend extTypes  {OGG .ogg}
+  lappend loadTypes {{Ogg Vorbis Files} {.ogg}}
+  lappend loadKeys  OGG
+  lappend saveTypes {{Ogg Vorbis Files} {.ogg}}
+  lappend saveKeys  OGG
+  
+  proc OggSettings {text} {
+    set w .ogg
+    catch {destroy $w}
+    toplevel $w
+    wm title $w "Ogg Vorbis Settings"
+
+    pack [frame $w.f1] -anchor w
+    pack [label $w.f1.l -text "Nominal bitrate:" -widt 16 -anchor w] -side left
+    pack [entry $w.f1.e -textvar ::ogg(nombr) -wi 7] -side left
+
+    pack [frame $w.f2] -anchor w
+    pack [label $w.f2.l -text "Max bitrate:" -width 16 -anchor w] -side left
+    pack [entry $w.f2.e -textvar ::ogg(maxbr) -wi 7] -side left
+
+    pack [frame $w.f3] -anchor w
+    pack [label $w.f3.l -text "Min bitrate:" -width 16 -anchor w] -side left
+    pack [entry $w.f3.e -textvar ::ogg(minbr) -wi 7] -side left
+    
+    pack [frame $w.f4] -anchor w
+    pack [label $w.f4.l -text "Comment:" -width 16 -anchor w] -side left
+    pack [entry $w.f4.e -textvar ::ogg(com) -wi 40] -side left
+
+    pack [frame $w.f5] -anchor w
+    pack [checkbutton $w.f5.b -text "Query settings before saving" \
+	-variable ::ogg(query) -anchor w] -side left
+
+    pack [frame $w.fb] -side bottom -fill x
+    pack [button $w.fb.cb -text $text -command "destroy $w"] -side top
+  }
+}
+
+snack::addExtTypes $extTypes
+snack::addLoadTypes $loadTypes $loadKeys
 
 proc GetOpenFileName {} {
     global f v
@@ -701,21 +767,29 @@ proc GetSaveFileName {title} {
     if {$labels != {} && [string compare $title "Save sample file"] != 0} {  
 	switch $v(labfmt) {
 	    MIX {
-		snack::addSaveTypes {{{MIX Files} {.mix}}} {MIX}
+	      lappend ::saveTypes {{MIX Files} {.mix}}
+	      lappend ::saveKeys  MIX
 	    }
 	    HTK {
-		snack::addSaveTypes {{{HTK Label Files} {.lab}}} {HTK}
+	      lappend ::saveTypes {{HTK Label Files} {.lab}}
+	      lappend ::saveKeys  HTK
 	    }
 	    TIMIT {
-		snack::addSaveTypes {{{TIMIT Label Files} {.phn}} {{TIMIT Label Files} {.wrd}}} {TIMIT}
+	      lappend ::saveTypes {{TIMIT Label Files} {.phn}} {{TIMIT Label Files} {.wrd}}
+	      lappend ::saveKeys  TIMIT
 	    }
 	    WAVES {
-		snack::addSaveTypes {{{Waves Label Files} {.lab}}} {WAVES}
+	      lappend ::saveTypes {{Waves Label Files} {.lab}}
+	      lappend ::saveKeys  WAVES
 	    }
 	    default
 	}
+	snack::addSaveTypes $::saveTypes $::saveKeys
+
 	set gotfn [snack::getSaveFile -initialdir $f(lpath) -initialfile $f(labfile) -format $v(labfmt) -title $title]
  } else {
+	snack::addSaveTypes $::saveTypes $::saveKeys
+
 	set gotfn [snack::getSaveFile -initialdir $f(spath) -initialfile $f(sndfile) -format $v(smpfmt) -title $title]
     }
 #    set tmp [string trimright $f(lpath) /].
@@ -755,36 +829,48 @@ proc Save {} {
 }
 
 proc SaveFile {{fn ""}} {
-    global f v labels
+  global f v labels
 
-    SetCursor watch
-    set strip_fn [lindex [file split [file rootname $fn]] end]
-    set ext  [file extension $fn]
-    if [string match macintosh $::tcl_platform(platform)] {
-	set path [file dirname $fn]:
+  SetCursor watch
+  set strip_fn [lindex [file split [file rootname $fn]] end]
+  set ext  [file extension $fn]
+  if [string match macintosh $::tcl_platform(platform)] {
+    set path [file dirname $fn]:
+  } else {
+    set path [file dirname $fn]/
+  }
+  if {$path == "./"} { set path ""}
+  if {![IsLabelFile $fn]} {
+    if {[info exists snack::snackogg]} {
+      if {$::ogg(query) && [string match -nocase .ogg $ext]} {
+	OggSettings Continue
+	tkwait window .ogg
+      }
+      if [catch {snd write $fn -progress snack::progressCallback \
+	  -nominalbitrate $::ogg(nombr) -maxbitrate $::ogg(maxbr) \
+	  -minbitrate $::ogg(minbr) -comment $::ogg(com)} msg] {
+	SetMsg "Save cancelled: $msg"
+      }
     } else {
-	set path [file dirname $fn]/
+      if [catch {snd write $fn -progress snack::progressCallback} msg] {
+	SetMsg "Save cancelled: $msg"
+      }
     }
-    if {$path == "./"} { set path ""}
-    if ![IsLabelFile $fn] {
-	if [catch {snd write $fn -progress snack::progressCallback} msg] {
-	    SetMsg "Save cancelled: $msg"
-	}
-	if {$v(linkfile)} {
-	    snd configure -file $fn
-	}
-	set v(smpchanged) 0
-	wm title . "xs: $fn"
-	set f(spath) $path
-	set f(sndfile) $strip_fn$ext
-    } elseif {$labels != {}} {
-	SaveLabelFile $labels $fn
-	set v(labchanged) 0
-	wm title . "xs: $f(spath)$f(sndfile) - $fn"
-	set f(lpath) $path
-	set f(labfile) $strip_fn$ext
+    if {$v(linkfile)} {
+	snd configure -file $fn
     }
-    SetCursor ""
+    set v(smpchanged) 0
+    wm title . "xs: $fn"
+    set f(spath) $path
+    set f(sndfile) $strip_fn$ext
+  } elseif {$labels != {}} {
+    SaveLabelFile $labels $fn
+    set v(labchanged) 0
+    wm title . "xs: $f(spath)$f(sndfile) - $fn"
+    set f(lpath) $path
+    set f(labfile) $strip_fn$ext
+  }
+  SetCursor ""
 }
 
 proc IsLabelFile {fn} {
@@ -927,7 +1013,7 @@ proc OpenFiles {fn} {
 	StopPlay
 
 	set f(byteOrder) [snd cget -byteorder]
-	set tmps [snack::sound]
+	set tmps [snack::sound -debug $::debug]
 	set ffmt [$tmps read $f(spath)$f(sndfile) -end 1 -guessproperties 1]
 	if {$ffmt == "RAW"} {
 	    set v(rate)      [$tmps cget -rate]
@@ -1030,7 +1116,8 @@ proc InterpretRawDialog {} {
 	    -value bigEndian -var ::f(byteOrder)] -anchor w
     pack [label $w.q.f4.l2 -text "\nRead Offset (bytes)"]
     pack [entry $w.q.f4.e -textvar f(skip) -wi 6]
-    snack::makeDialogBox $w -title "Interpret Raw File As" -type okcancel
+    snack::makeDialogBox $w -title "Interpret Raw File As" -type okcancel \
+	-default ok
 }
 
 proc Link2File {} {
@@ -1095,6 +1182,7 @@ proc ConfigTransformMenu {} {
 	snack::menuEntryOff Transform Invert
 	snack::menuEntryOff Transform Reverse
 	snack::menuEntryOff Transform Silence
+	snack::menuEntryOff Transform {Remove DC}
     } else {
 	snack::menuEntryOn Transform Conversions
 	snack::menuEntryOn Transform Amplify...
@@ -1104,6 +1192,7 @@ proc ConfigTransformMenu {} {
 	snack::menuEntryOn Transform Invert
 	snack::menuEntryOn Transform Reverse
 	snack::menuEntryOn Transform Silence
+	snack::menuEntryOn Transform {Remove DC}
     }
     if {[snd cget -channels] == 1} {
 	snack::menuEntryOff Transform {Mix Channels...}
@@ -1466,6 +1555,7 @@ proc Reverse {} {
     set v(redoc) "snd reverse -start $start -end $end"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc Invert {} {
@@ -1490,6 +1580,7 @@ proc Invert {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc Silence {} {
@@ -1514,6 +1605,31 @@ proc Silence {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
+}
+
+proc RemoveDC {} {
+    global v remdc
+
+    if {[Marker2Sample m1] == [Marker2Sample m2]} MarkAll
+    set start [Marker2Sample m1]
+    set end   [Marker2Sample m2]
+    if {$start == $end} return
+    SetMsg "Removing DC for range: $start $end"
+
+    cbs copy snd
+    if [catch {snd filter $remdc(f) -start $start -end $end \
+	    -progress snack::progressCallback -continuedrain 0}] {
+	SetMsg "Remove DC cancelled"
+	snd copy cbs
+	return
+    }
+
+    set v(undoc) "snd swap cbs"
+    set v(redoc) "snd swap cbs"
+    set v(smpchanged) 1
+    .tb.undo config -state normal
+    Redraw
 }
 
 proc ConfAmplify {flag} {
@@ -1561,6 +1677,7 @@ proc DoAmplify {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc Amplify {} {
@@ -1618,7 +1735,7 @@ proc DoNormalize {} {
     set end   [Marker2Sample m2]
     if {$start == $end} return
     SetMsg "Normalizing range: $start $end"
-
+  
     if {$normalize(db) == 1} {
 	set tmp [expr {pow(10,$normalize(v)/20.0)}]
     } else {
@@ -1626,6 +1743,8 @@ proc DoNormalize {} {
     }
     if {[string match [snd cget -encoding] Lin8]} {
 	set smax 255.0
+    } elseif {[string match [snd cget -encoding] Lin24]} {
+        set smax 8388608.0
     } else {
 	set smax 32767.0
     }
@@ -1669,6 +1788,7 @@ proc DoNormalize {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc Normalize {} {
@@ -1735,6 +1855,7 @@ proc DoEcho {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc PlayEcho {} {
@@ -1882,6 +2003,7 @@ proc DoMix {} {
     set v(redoc) "snd swap cbs"
     set v(smpchanged) 1
     .tb.undo config -state normal
+    Redraw
 }
 
 proc PlayMix {} {
@@ -2025,7 +2147,7 @@ proc RecvXScroll {a} {
 }
 
 proc Redraw {args} {
-    global c labels f v debug
+    global c labels f v
 
     SetCursor watch
     set length [snd length]
@@ -2059,7 +2181,7 @@ proc Redraw {args} {
 		$c create waveform 0 0 -sound snd -height $v(waveh) \
 			-pixels $v(pps) -tags [list obj wave] \
 			-start $v(startsmp) -end $v(endsmp) \
-			-channel $v(vchan) -debug $debug -fill $v(fg) \
+			-channel $v(vchan) -debug $::debug -fill $v(fg) \
 	-shapefile [file rootname [file tail $f(spath)$f(sndfile)]].shape\
 			-progress snack::progressCallback
 		snack::makeShapeFileDeleteable [file tail $f(spath)$f(sndfile)]
@@ -2067,7 +2189,7 @@ proc Redraw {args} {
 		$c create waveform 0 0 -sound snd -height $v(waveh) \
 			-pixels $v(pps) -tags [list obj wave] \
 			-start $v(startsmp) -end $v(endsmp) \
-			-channel $v(vchan) -debug $debug -fill $v(fg)
+			-channel $v(vchan) -debug $::debug -fill $v(fg)
 	    }
 	    $c lower wave
 	    .cf.fyc.yc create text $v(yaxisw) 2 -text [snd max]\
@@ -2082,6 +2204,9 @@ proc Redraw {args} {
 	}
 	if {$v(spegh) > 0} {
 	    set v(winlen) [expr int($v(rate) / $v(anabw))]
+	    if {$v(winlen) > $v(fftlen)} {
+	      set v(winlen) $v(fftlen)
+	    }
 	    $c create spectrogram 0 $v(waveh) -sound snd -fftlen $v(fftlen) \
 		    -winlen $v(winlen) -height $v(spegh) -pixels $v(pps) \
 		    -preemph $v(preemph) -topfr $v(topfr) -tags [list obj speg] \
@@ -2090,7 +2215,7 @@ proc Redraw {args} {
 		    -gridtspacing $v(gridtspacing) \
 		    -gridfspacing $v(gridfspacing) -channel $v(vchan) \
 		    -colormap $v($v(cmap)) -gridcol $v(gridcolor) \
-		    -progress snack::progressCallback -debug $debug
+		    -progress snack::progressCallback -debug $::debug
 	    $c lower speg
 	    snack::frequencyAxis .cf.fyc.yc 0 $v(waveh) $v(yaxisw) $v(spegh)\
 		    -topfrequency $v(topfr) -tags axis -fill $v(fg)\
@@ -2280,16 +2405,20 @@ proc RePos {args} {
 }
 
 proc DrawOverAxis {} {
-    global v
-
-    set totw [winfo width .]
-    set scrh [winfo height .of.xscroll]
-    set width [expr $totw - 2 * $scrh]
-    set length [snd length -unit seconds]
+  global v
+  
+  set totw [winfo width .]
+  set scrh [winfo height .of.xscroll]
+  set width [expr $totw - 2 * $scrh]
+  set length [snd length -unit seconds]
+  if {$length > 0} {
     set v(opps) [expr $width/$length]
-    .of.c delete overaxis
-    snack::timeAxis .of.c $scrh 20 $width 11 $v(opps) -tags overaxis \
-	    -fill $v(fg)
+  } else {
+    set v(opps) 400
+  }
+  .of.c delete overaxis
+  snack::timeAxis .of.c $scrh 20 $width 11 $v(opps) -tags overaxis \
+      -fill $v(fg)
 }
 
 proc OverPlay {x} {
@@ -2308,7 +2437,7 @@ proc OverPlay {x} {
 }
 
 proc Reconf {} {
-    global c v f debug
+    global c v f
 
     set dox 0
     set doy 0
@@ -2336,11 +2465,11 @@ proc Reconf {} {
 	.of.c delete overwave
         if {$v(linkfile) && $f(sndfile) != ""} {
 	    .of.c create waveform $v(scrh) 0 -sound snd -height 20 \
-		    -width $totw -tags overwave -fill $v(fg) -debug $debug \
+		    -width $totw -tags overwave -fill $v(fg) -debug $::debug \
 	    -shapefile [file rootname [file tail $f(spath)$f(sndfile)]].shape
 	} else {
 	    .of.c create waveform $v(scrh) 0 -sound snd -height 20 \
-		    -width $totw -tags overwave -fill $v(fg) -debug $debug
+		    -width $totw -tags overwave -fill $v(fg) -debug $::debug
 	}
 	.of.c create rectangle -1 -1 -1 -1 -tags mark -fill yellow -stipple gray25
     }
@@ -2650,7 +2779,7 @@ proc ToggleRecording {} {
 }
 
 proc Record {} {
-    global c v rec debug
+    global c v rec
 
     StopPlay
     set v(smpchanged) 1
@@ -2662,13 +2791,13 @@ proc Record {} {
     if {$v(waveh) > 0} {
 	$c create waveform 0 0 -sound snd -height $v(waveh) -pixels $v(pps) \
 		-width $width -tags [list obj recwave] -channel $v(vchan) \
-		-debug $debug -fill red
+		-debug $::debug -fill red
     }
     if {$v(spegh) > 0} {
 	$c create spectrogram 0 $v(waveh) -sound snd -height $v(spegh) \
 		-pixels $v(pps) \
 		-width $width -tags [list obj recwave] -channel $v(vchan) \
-		-colormap $v($v(cmap)) -debug $debug
+		-colormap $v($v(cmap)) -debug $::debug
     }
     if {$v(linkfile)} {
 	catch {file delete -force _xs[pid].wav}
@@ -2795,15 +2924,11 @@ proc Undo {} {
 
     if {[cbs length] != 0} {
 	eval $v(undoc)
-	set tmp $v(undoc)
-	set v(undoc) $v(redoc)
-	set v(redoc) $tmp
+        foreach {v(undoc) v(redoc)} [list $v(redoc) $v(undoc)] break
 	DrawOverAxis
 	Redraw
     } else {
-	set tmp $labels
-	set labels $undo
-	set undo $tmp
+        foreach {labels undo} [list $undo $labels] break
 	Redraw quick
     }
     SetMsg ""
@@ -3526,7 +3651,9 @@ proc PutMarker {m x y f} {
 	set xc [Time2Coord $x]
 	set t $x
     }
-
+    if {$t >= [snd length]} {
+      set t [expr {[snd length]-1}]
+    }
     $c itemconf $m -tags [list mark $t $m]
     $c coords $m $xc 0 $xc $v(toth)
 
@@ -3660,6 +3787,7 @@ proc OpenSectWindow {} {
     catch {destroy .sect}
     toplevel .sect -width $s(sectwinw) -height $s(sectwinh)
     wm title .sect "Spectrum section plot"
+    wm geometry .sect +$s(sectwinx)+$s(sectwiny)
     pack propagate .sect 0
 
     set s(ostart) ""
@@ -3670,19 +3798,33 @@ proc OpenSectWindow {} {
     pack [button .sect.f.exitB -text Close -command {destroy .sect}] -side left
     pack [canvas .sect.c -closeenough 5 -cursor draft_small -bg $v(bg)] -fill both -expand true
 
-    pack [frame .sect.f2]
-    pack [label .sect.f2.l1 -text "FFT points:" -anchor w] -side left
+    pack [frame .sect.f1]
+    label .sect.f1.l1 -text "FFT points:" -anchor w
 #    pack [entry .sect.f2.e1 -textvar s(fftlen) -wi 6] -side left
-    tk_optionMenu .sect.f2.cm1 s(fftlen) 64 128 256 512 1024 2048 4096 8192 16384
+    tk_optionMenu .sect.f1.m1 s(fftlen) 64 128 256 512 1024 2048 4096 8192 16384
     for {set n 0} {$n < 7} {incr n} {
-	.sect.f2.cm1.menu entryconfigure $n -command DrawSect
+      .sect.f1.m1.menu entryconfigure $n -command DrawSect
     }
-
-    tk_optionMenu .sect.f2.cm2 s(wintype) \
-	 Hamming Hanning Bartlett Blackman Rectangle
-    pack .sect.f2.cm1 .sect.f2.cm2 -side left
+    label .sect.f1.l2 -text "Window:"
+    tk_optionMenu .sect.f1.m2 s(wintype) \
+	Hamming Hanning Bartlett Blackman Rectangle
+    pack .sect.f1.l1 .sect.f1.m1 .sect.f1.l2 .sect.f1.m2 -side left
 #    pack [label .sect.f2.l2 -text "Preemphasis:" -anchor w] -side left
 #    pack [entry .sect.f2.e2 -textvar s(ref) -wi 6] -side left
+
+    pack [frame .sect.f2]
+    label .sect.f2.l1 -text "Analysis:"
+    tk_optionMenu .sect.f2.m1 s(atype) FFT LPC
+    .sect.f2.m1.menu entryconfigure 0 -command [list LPCcontrols disabled]
+    .sect.f2.m1.menu entryconfigure 1 -command [list LPCcontrols normal]
+    label .sect.f2.l2 -text "Order:"
+    entry .sect.f2.e -textvariable s(lpcorder) -width 3
+    scale .sect.f2.s -variable s(lpcorder) -from 1 -to 40 -orient horiz \
+	-length 80 -show no
+    bind .sect.f2.s <Button1-Motion> DrawSect
+    pack .sect.f2.l1 .sect.f2.m1 .sect.f2.l2 .sect.f2.e .sect.f2.s -side left
+    if {$s(atype) != "LPC"} { LPCcontrols disabled }
+    if {$s(lpcorder) < 1} { set s(lpcorder) 20 }
 
     pack [frame .sect.f3]
     pack [label .sect.f3.l2 -text "Reference:" -anchor w] -side left
@@ -3712,13 +3854,20 @@ proc OpenSectWindow {} {
     bind .sect.c <Leave>  {.sect.c coords sx -1 -1 -1 -1;.sect.c coords sy -1 -1 -1 -1}
 }
 
+proc LPCcontrols {state} {
+  .sect.f2.e configure -state $state
+  .sect.f2.s configure -state $state
+}
+
 proc DrawSect {} {
-    global c s v debug
+    global c s v
 
     if [winfo exists .sect] {
 	set geom [lindex [split [wm geometry .sect] +] 0]
 	set s(sectwinw) [lindex [split $geom x] 0]
 	set s(sectwinh) [lindex [split $geom x] 1]
+        set s(sectwinx) [lindex [split [wm geometry .sect] +] 1]
+        set s(sectwiny) [lindex [split [wm geometry .sect] +] 2]
 	set s(sectw) [expr [winfo width .sect.c] - 25]
 	set s(secth) [expr [winfo height .sect.c] - 20]
 	set s(sectcw) [winfo width .sect.c]
@@ -3737,18 +3886,18 @@ catch {
 		    -width $s(sectw) -maxvalue [expr 10.0*$s(top)] \
 		    -minvalue [expr 10.0*$s(bot)] \
 		    -start $s(ostart) -end $s(oend) -tags sect \
-		    -fftlen $s(fftlen) \
+		    -fftlen $s(fftlen) -analysistype $s(atype) \
+		    -lpcorder $s(lpcorder) \
 		    -winlen $s(fftlen) -channel $v(vchan) -fill red \
 		    -topfr $v(topfr) -windowtype $s(wintype)
-
 	}
 	.sect.c create section 25 0 -sound snd -height $s(secth) \
 		-width $s(sectw) -maxvalue [expr 10.0*$s(top)] \
 		-minval [expr 10.0*$s(bot)] \
 		-start $s(start) -end $s(end) -tags sect -fftlen $s(fftlen) \
 		-winlen $s(fftlen) -channel $v(vchan) -frame 1 \
-		-debug $debug -fill $v(fg) \
-		-topfr $v(topfr) -windowtype $s(wintype)
+		-debug $::debug -fill $v(fg) -analysistype $s(atype) \
+		-lpcorder $s(lpcorder) -topfr $v(topfr) -windowtype $s(wintype)
     }
 	.sect.c create text -10 -10 -text df: -font $v(sfont) -tags df \
 		-fill blue
@@ -3783,7 +3932,8 @@ proc Export {} {
 
     set ps [snd dBPowerSpectrum -start $s(start) -end $s(end) \
 	    -fftlen $s(fftlen) -windowlen $s(fftlen) -channel $v(vchan) \
-	    -windowtype $s(wintype)]
+	    -windowtype $s(wintype) -analysistype $s(atype) \
+	    -lpcorder $s(lpcorder)]
 
     set file [tk_getSaveFile -title "Export spectral data" -initialfile spectrum.txt]
     if {$file == ""} return
@@ -3861,6 +4011,7 @@ proc OpenZoomWindow {} {
     catch {destroy .zmenu}
     toplevel .zoom -width $z(zoomwinw) -height $z(zoomwinh)
     wm title .zoom "Zoom view"
+    wm geometry .zoom +$z(zoomwinx)+$z(zoomwiny)
     pack propagate .zoom 0
 
     frame .zoom.f
@@ -3896,6 +4047,8 @@ proc DrawZoom {factor} {
 	set geom [lindex [split [wm geometry .zoom] +] 0]
 	set z(zoomwinw) [lindex [split $geom x] 0]
 	set z(zoomwinh) [lindex [split $geom x] 1]
+        set z(zoomwinx) [lindex [split [wm geometry .zoom] +] 1]
+        set z(zoomwiny) [lindex [split [wm geometry .zoom] +] 2]
 	set z(zoomwavw) [winfo width .zoom.c]
 	set z(zoomwavh) [winfo height .zoom.c]
 	set z(f) [expr $z(f) * $factor]
@@ -4492,8 +4645,22 @@ proc SaveSettings {} {
 	puts $out "set f(ipath) $f(ipath)"
 	puts $out "set f(ihttp) $f(ihttp)"
 
-	puts $out "set s(fftlen) $s(fftlen)"
-	puts $out "set s(anabw)  $s(anabw)"
+	puts $out "set s(fftlen)  $s(fftlen)"
+	puts $out "set s(anabw)   $s(anabw)"
+	puts $out "set s(wintype) $s(wintype)"
+	puts $out "set s(ref)     $s(ref)"
+	puts $out "set s(range)   $s(range)"
+	puts $out "set s(atype)   $s(atype)"
+	puts $out "set s(lpcorder) $s(lpcorder)"
+      
+      if {[info exists snack::snackogg]} {
+	puts $out "set ogg(nombr) $::ogg(nombr)"
+	puts $out "set ogg(maxbr) $::ogg(maxbr)"
+	puts $out "set ogg(minbr) $::ogg(minbr)"
+	puts $out "set ogg(com)   $::ogg(com)"
+	puts $out "set ogg(query) $::ogg(query)"
+      }
+
 	close $out
     }
 }

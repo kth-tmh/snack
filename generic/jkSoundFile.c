@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2001 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2002 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -723,7 +723,7 @@ ReadSound(readSamplesProc *readProc, Sound *s, Tcl_Interp *interp,
 
 int
 WriteSound(writeSamplesProc *writeProc, Sound *s, Tcl_Interp *interp,
-	   Tcl_Channel ch, Tcl_Obj *obj, int startpos, int len, int hdsize)
+	   Tcl_Channel ch, Tcl_Obj *obj, int startpos, int len)
 {
   int i = 0, j;
   short sh;
@@ -892,13 +892,20 @@ WriteSound(writeSamplesProc *writeProc, Sound *s, Tcl_Interp *interp,
 	}
       }
     } else { /* writeProc != NULL */
-      int tot = len, n = 0;
-      
+      int tot = len;
+
       while (tot > 0) {
-	int size = min(tot, FBLKSIZE);
-	(writeProc)(s, ch, obj, s->blocks[n], size);
+	int size = min(tot, FBLKSIZE/2), res;
+
+	(writeProc)(s, ch, obj, startpos, size);
+
 	tot -= size;
-	n++;
+	startpos += size;
+	res = Snack_ProgressCallback(s->cmdPtr, interp, "Writing sound",
+				     1.0-(double)tot/len);
+	if (res != TCL_OK) {
+	  return TCL_ERROR;
+	}
       }
     }
     Snack_ProgressCallback(s->cmdPtr, interp, "Writing sound", 1.0);
@@ -906,12 +913,12 @@ WriteSound(writeSamplesProc *writeProc, Sound *s, Tcl_Interp *interp,
     unsigned char *p = NULL;
     
     if (useOldObjAPI) {
-      Tcl_SetObjLength(obj, hdsize + len * s->sampsize);
-      p = (unsigned char *) &obj->bytes[hdsize];
+      Tcl_SetObjLength(obj, s->headSize + len * s->sampsize);
+      p = (unsigned char *) &obj->bytes[s->headSize];
     } else {
 #ifdef TCL_81_API
-      p = Tcl_SetByteArrayLength(obj, hdsize +len * s->sampsize);
-      p = &p[hdsize];
+      p = Tcl_SetByteArrayLength(obj, s->headSize +len * s->sampsize);
+      p = &p[s->headSize];
 #endif
     }
     for (i = startpos, j = 0; i < startpos + len; i++, j++) {
@@ -1275,9 +1282,11 @@ GetRawHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 static int
 PutRawHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	     int len)
+	     int objc, Tcl_Obj *CONST objv[], int len)
 {
-  return(0);
+  s->headSize = 0;
+  
+  return TCL_OK;
 }
 
 #define NIST_HEADERSIZE 1024
@@ -1360,7 +1369,7 @@ GetSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 static int
 PutSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	     int len)
+	     int objc, Tcl_Obj *CONST objv[], int len)
 {
   int i = 0;
   char buf[HEADBUF];
@@ -1400,9 +1409,12 @@ PutSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   }
   s->inByteOrder = SNACK_NATIVE;
   s->swap = 0;
-
-  return(NIST_HEADERSIZE);
+  s->headSize = NIST_HEADERSIZE;
+  
+  return TCL_OK;
 }
+
+#define SNACK_SD_INT 20
 
 static int
 GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
@@ -1440,14 +1452,31 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 	}
       }
       memcpy(&start, &buf[i], 8);
+
+      if (s->extHead != NULL && s->extHeadType != SNACK_SD_INT) {
+	Snack_FileFormat *ff;
+	
+	for (ff = snackFileFormats; ff != NULL; ff = ff->nextPtr) {
+	  if (strcmp(s->fileType, ff->name) == 0) {
+	    if (ff->freeHeaderProc != NULL) {
+	      (ff->freeHeaderProc)(s);
+	    }
+	  }
+	}
+      }
+      if (s->extHead == NULL) {
+	s->extHead = (char *) ckalloc(sizeof(double));
+	memcpy(s->extHead, &buf[i], sizeof(double));
+	s->extHeadType = SNACK_SD_INT;
+      }
     }
   }
-
+  
   s->encoding = LIN16;
   s->sampsize = 2;
   s->nchannels = 1;
-  s->samprate = (short) freq;
-  s->loadOffset = (int) (start * s->samprate + 0.5);
+  s->samprate = (int) freq;
+  s->loadOffset = 0; /*(int) (start * s->samprate + 0.5);*/
 
   if (ch != NULL) {
     Tcl_Seek(ch, 0, SEEK_END);
@@ -1474,6 +1503,54 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   SwapIfLE(s);
 
   return TCL_OK;
+}
+
+static int
+ConfigSdHeader(Sound *s, Tcl_Interp *interp, int objc,
+                Tcl_Obj *CONST objv[])
+{
+  int index;
+  static char *optionStrings[] = {
+    "-start_time", NULL
+  };
+  enum options {
+    STARTTIME
+  };
+
+  if (s->extHeadType != SNACK_SD_INT || objc < 3) return 0;
+
+  if (objc == 3) { /* get option */
+    if (Tcl_GetIndexFromObj(interp, objv[2], optionStrings, "option", 0,
+                            &index) != TCL_OK) {
+      Tcl_AppendResult(interp, ", or\n", NULL);
+      return 0;
+    }
+
+    switch ((enum options) index) {
+    case STARTTIME:
+      {
+	double *start = (double *) s->extHead;
+        Tcl_SetObjResult(interp, Tcl_NewDoubleObj(*start));
+        break;
+      }
+    }
+  }
+
+  return 1;
+}
+
+static void
+FreeSdHeader(Sound *s)
+{
+  if (s->debug > 2) Snack_WriteLog("    Enter FreeSdHeader\n");
+
+  if (s->extHead != NULL) {
+    ckfree((char *)s->extHead);
+    s->extHead = NULL;
+    s->extHeadType = 0;
+  }
+  
+  if (s->debug > 2) Snack_WriteLog("    Exit FreeSdHeader\n");
 }
 
 #define SND_FORMAT_MULAW_8   1
@@ -1543,13 +1620,16 @@ GetAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   }
   s->samprate = GetBELong(buf, 16);
   s->nchannels = GetBELong(buf, 20);
+  if (hlen < 24) {
+    hlen = 24;
+  }
   s->headSize = hlen;
   nsamp = GetBELong(buf, 8) / (s->sampsize * s->nchannels);
 
   if (ch != NULL) {
     Tcl_Seek(ch, 0, SEEK_END);
     nsampfile = (Tcl_Tell(ch) - hlen) / (s->sampsize * s->nchannels);
-    if (nsampfile < nsamp || nsamp == 0) {
+    if (nsampfile < nsamp || nsamp <= 0) {
       nsamp = nsampfile;
     }
   }
@@ -1577,7 +1657,7 @@ GetAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 static int
 PutAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	    int len)
+	    int objc, Tcl_Obj *CONST objv[], int len)
 {
   int fmt = 0;
   char buf[HEADBUF];
@@ -1642,8 +1722,9 @@ PutAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     SwapIfLE(s);
   }
   s->inByteOrder = SNACK_BIGENDIAN;
-
-  return(AU_HEADERSIZE);
+  s->headSize = AU_HEADERSIZE;
+  
+  return TCL_OK;
 }
 
 #define WAVE_FORMAT_PCM	1
@@ -1652,6 +1733,7 @@ PutAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 #  define WAVE_FORMAT_ALAW  6
 #  define WAVE_FORMAT_MULAW 7
 #endif
+#define WAVE_EX		(-2)	/* (OxFFFE) in a 2-byte word */
 
 static int
 GetHeaderBytes(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *buf, 
@@ -1690,6 +1772,10 @@ GetWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       s->nchannels = GetLEShort(buf, i+10);
       s->samprate  = GetLELong(buf, i+12);
       s->sampsize  = GetLEShort(buf, i+22) / 8;
+
+      /* For WAVE-EX, the format is the first two bytes of the GUID */
+      if (fmt == WAVE_EX)
+	fmt = GetLEShort(buf, i+32);
 
       switch (fmt) {
       case WAVE_FORMAT_PCM:
@@ -1817,7 +1903,7 @@ GetWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 static int
 PutWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	     int len)
+	     int objc, Tcl_Obj *CONST objv[], int len)
 {
   char buf[HEADBUF];
 
@@ -1873,8 +1959,9 @@ PutWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     }
   }
   s->inByteOrder = SNACK_LITTLEENDIAN;
-
-  return(SNACK_WAV_HEADERSIZE);
+  s->headSize = SNACK_WAV_HEADERSIZE;
+  
+  return TCL_OK;
 }
 
 /* See http://www.borg.com/~jglatt/tech/aiff.htm */
@@ -1927,6 +2014,9 @@ StoreFloat(unsigned char * buffer, unsigned long value)
   memcpy(buffer + 2, &value, sizeof(long));
 }
 
+#define ICEILV(n,m)	(((n) + ((m) - 1)) / (m))	/* int n,m >= 0 */
+#define RNDUPV(n,m)	((m) * ICEILV (n, m))		/* Round up */
+
 static int
 GetAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 	      char *buf)
@@ -1947,7 +2037,7 @@ GetAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       }
       s->nchannels = GetBEShort(buf, i + 8);
       bits = GetBEShort(buf, i + 14);
-      
+      bits = RNDUPV (bits, 8);
       switch (bits) {
       case 8:
 	s->encoding = LIN8;
@@ -1965,6 +2055,9 @@ GetAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 	s->encoding = LIN32;
 	s->sampsize = 4;
 	break;
+      default:
+	Tcl_AppendResult(interp, "Unsupported AIFF format", NULL);
+	return TCL_ERROR;
       }
       s->samprate = ConvertFloat((unsigned char *)&buf[i+16]);
       if (s->debug > 3) {
@@ -2008,7 +2101,7 @@ GetAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 int
 PutAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	      int len)
+	      int objc, Tcl_Obj *CONST objv[], int len)
 {
   char buf[HEADBUF];
 
@@ -2056,8 +2149,9 @@ PutAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     }
   }
   s->inByteOrder = SNACK_BIGENDIAN;
-
-  return(SNACK_AIFF_HEADERSIZE);
+  s->headSize = SNACK_AIFF_HEADERSIZE;
+  
+  return TCL_OK;
 }
 
 static int
@@ -2110,15 +2204,15 @@ GetCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 	Snack_WriteLogInt("      HDR8 block parsed", chunkLen);
       }
     } else if (strncasecmp("SDA_", &buf[i], strlen("SDA_")) == 0) {
-      nsamp = GetLELong(buf, i + 4) / (s->sampsize * s->nchannels);
       s->nchannels  = 1;
+      nsamp = GetLELong(buf, i + 4) / (s->sampsize * s->nchannels);
       if (s->debug > 3) {
 	Snack_WriteLogInt("      SDA_ block parsed", nsamp);
       }
       break;
     } else if (strncasecmp("SD_B", &buf[i], strlen("SD_B")) == 0) {
-      nsamp = GetLELong(buf, i + 4) / (s->sampsize * s->nchannels);
       s->nchannels  = 1;
+      nsamp = GetLELong(buf, i + 4) / (s->sampsize * s->nchannels);
       if (s->debug > 3) {
 	Snack_WriteLogInt("      SD_B block parsed", nsamp);
       }
@@ -2192,7 +2286,7 @@ GetCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 
 static int
 PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
-	     int len)
+	     int objc, Tcl_Obj *CONST objv[], int len)
 {
   char buf[HEADBUF];
 
@@ -2203,7 +2297,7 @@ PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   
   sprintf(&buf[0], "FORMDS16");
   if (len != -1) {
-    PutLELong(buf, 8, len * s->sampsize * s->nchannels + 78);
+    PutLELong(buf, 8, len * s->sampsize * s->nchannels + 76);
   } else {
     SwapIfBE(s);
     PutLELong(buf, 8, 0);
@@ -2253,16 +2347,24 @@ PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     }
   }
   s->inByteOrder = SNACK_LITTLEENDIAN;
-
-  return(SNACK_CSL_HEADERSIZE);
+  s->headSize = SNACK_CSL_HEADERSIZE;
+  
+  return TCL_OK;
 }
 
 int
 SnackOpenFile(openProc *openProc, Sound *s, Tcl_Interp *interp,
 	      Tcl_Channel *ch, char *mode)
 {
+  int permissions;
+
+  if (strcmp(mode, "r") == 0) {
+    permissions = 0;
+  } else {
+    permissions = 420;
+  }
   if (openProc == NULL) {
-    if ((*ch = Tcl_OpenFileChannel(interp, s->fcname, mode, 0)) == 0) {
+    if ((*ch = Tcl_OpenFileChannel(interp, s->fcname, mode, permissions))==0) {
       return TCL_ERROR;
     }
     Tcl_SetChannelOption(interp, *ch, "-translation", "binary");
@@ -2354,34 +2456,34 @@ LoadSound(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj, int startpos,
 
 int
 SaveSound(Sound *s, Tcl_Interp *interp, char *filename, Tcl_Obj *obj,
-	  int startpos, int len, char *type)
+	  int objc, Tcl_Obj *CONST objv[], int startpos, int len, char *type)
 {
   Tcl_Channel ch = NULL;
   Snack_FileFormat *ff;
-  int hdsize;
+  char *tmp = s->fcname;
 
   if (s->debug > 1) Snack_WriteLog("  Enter SaveSound\n");
 
   for (ff = snackFileFormats; ff != NULL; ff = ff->nextPtr) {
     if (strcmp(type, ff->name) == 0) {
       if (ff->putHeaderProc != NULL) {
+	s->fcname = filename;
 	if (filename != NULL) {
-	  if ((ch = Tcl_OpenFileChannel(interp, filename, "w", 420)) == 0) {
+	  if (SnackOpenFile(ff->openProc, s, interp, &ch, "w") != TCL_OK) {
 	    return TCL_ERROR;
 	  }
-	  Tcl_SetChannelOption(interp, ch, "-translation", "binary");
-#ifdef TCL_81_API
-	  Tcl_SetChannelOption(interp, ch, "-encoding", "binary");
-#endif
 	}
-	if ((hdsize = (ff->putHeaderProc)(s, interp, ch, obj, len)) < 0) {
+	if ((ff->putHeaderProc)(s, interp, ch, obj, objc, objv, len)
+	    != TCL_OK) {
 	  return TCL_ERROR;
 	}
 	if (WriteSound(ff->writeProc, s, interp, ch, obj, startpos,
-		       len, hdsize) != TCL_OK) {
+		       len) != TCL_OK) {
 	  Tcl_AppendResult(interp, "Error while writing", NULL);
+	  s->fcname = tmp;
 	  return TCL_ERROR;
 	}
+	s->fcname = tmp;
       } else {
 	Tcl_AppendResult(interp, "Unsupported save format", NULL);
 	return TCL_ERROR;
@@ -2391,7 +2493,7 @@ SaveSound(Sound *s, Tcl_Interp *interp, char *filename, Tcl_Obj *obj,
   }
 
   if (ch != NULL) {
-    Tcl_Close(interp, ch);
+    SnackCloseFile(ff->closeProc, s, interp, &ch);
   }
 
   if (s->debug > 1) Snack_WriteLog("  Exit SaveSound\n");
@@ -2571,11 +2673,35 @@ readCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
   return TCL_OK;
 }
 
+void
+Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[], char **subOptionStrings,
+		    int *newobjc, Tcl_Obj **newobjv)
+{
+  int arg, n = 0;
+  Tcl_Obj **new = NULL;
+
+  if ((new = (Tcl_Obj **) ckalloc(sizeof(Tcl_Obj *) * objc)) == NULL) {
+    return;
+  }
+  for (arg = 0; arg < objc; arg+=2) {
+    int index;
+    
+    if (Tcl_GetIndexFromObj(NULL, objv[arg], subOptionStrings,
+			    NULL, 0, &index) != TCL_OK) {
+      new[n++] = Tcl_DuplicateObj(objv[arg]);
+      if (n < objc) new[n++] = Tcl_DuplicateObj(objv[arg+1]);
+    }
+  }
+  *newobjc = n;
+  *newobjv = (Tcl_Obj *) new;
+}
+
 int
 writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-  int startpos = 0, endpos = s->length, arg, len;
+  int startpos = 0, endpos = s->length, arg, len, newobjc;
   char *string, *filetype = NULL;
+  Tcl_Obj **newobjv = NULL;
   static char *subOptionStrings[] = {
     "-start", "-end", "-fileformat", "-progress", "-byteorder", NULL
   };
@@ -2600,9 +2726,9 @@ writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   for (arg = 3; arg < objc; arg+=2) {
     int index;
 	
-    if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings,
+    if (Tcl_GetIndexFromObj(NULL, objv[arg], subOptionStrings,
 			    "option", 0, &index) != TCL_OK) {
-      return TCL_ERROR;
+      continue;
     }
 	
     if (arg + 1 == objc) {
@@ -2664,7 +2790,10 @@ writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   if (endpos > startpos) len -= (len - endpos);
   if (startpos > endpos) return TCL_OK;
   if (startpos > 0) len -= startpos; else startpos = 0;
-      
+
+  Snack_RemoveOptions(objc-3, objv+3, subOptionStrings, &newobjc,
+		      (Tcl_Obj **) &newobjv);
+
   if (objc < 3) {
     Tcl_AppendResult(interp, "No file name given", NULL);
     return TCL_ERROR;
@@ -2681,9 +2810,16 @@ writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       OpenLinkedFile(s, &s->linkInfo);
     }
   }
-  if (SaveSound(s, interp, string, NULL, startpos, len, filetype)==TCL_ERROR) {
+  if (SaveSound(s, interp, string, NULL, newobjc, (Tcl_Obj **CONST) newobjv,
+		startpos, len, filetype) == TCL_ERROR) {
     return TCL_ERROR;
   }
+
+
+  for (arg = 0; arg <newobjc; arg++) {
+    Tcl_DecrRefCount(newobjv[arg]);
+  }
+  ckfree((char *)newobjv);
 
   if (s->debug > 0) { Snack_WriteLog("Exit writeCmd\n"); }
 
@@ -2772,7 +2908,7 @@ dataCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     if (startpos > endpos) return TCL_OK;
     if (startpos > 0) len -= startpos; else startpos = 0;
 
-    if (SaveSound(s, interp, NULL, new, startpos, len, filetype)
+    if (SaveSound(s, interp, NULL, new, objc-2, objv+2, startpos, len,filetype)
 	== TCL_ERROR) {
       return TCL_ERROR;
     }
@@ -2913,11 +3049,14 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
 {
   Snack_FileFormat *ff;
   Tcl_Channel ch = NULL;
-  int status = TCL_OK;
+  int status = TCL_OK, openedOk = 0;
   int buflen = max(HEADBUF, NFIRSTSAMPLES * 2), len = 0;
 
   if (s->guessEncoding) {
     s->swap = 0;
+  }
+  if (s->tmpbuf != NULL) {
+    ckfree((char *)s->tmpbuf);
   }
   if ((s->tmpbuf = (short *) ckalloc(buflen)) == NULL) {
     Tcl_AppendResult(interp, "Could not allocate buffer!", NULL);
@@ -2935,6 +3074,8 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
 	ch = NULL;
       }
     } else {
+      ckfree((char *)s->tmpbuf);
+      s->tmpbuf = NULL;
       return TCL_ERROR;
     }
   } else {
@@ -2962,6 +3103,7 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
     if (strcmp(s->fileType, ff->name) == 0) {
       if (obj == NULL) {
 	status = SnackOpenFile(ff->openProc, s, interp, &ch, "r");
+	if (status == TCL_OK) openedOk = 1;
       }
       if (status == TCL_OK) {
 	status = (ff->getHeaderProc)(s, interp, ch, obj, (char *)s->tmpbuf);
@@ -2969,9 +3111,8 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
       if (strcmp(s->fileType, RAW_STRING) == 0 && s->guessEncoding) {
 	GuessEncoding(s, (unsigned char *)s->tmpbuf, len);
       }
-      if (obj == NULL && status == TCL_OK) {
+      if (obj == NULL && openedOk == 1) {
 	status = SnackCloseFile(ff->closeProc, s, interp, &ch);
-	/*	Tcl_Close(interp, ch);*/
       }
       ckfree((char *)s->tmpbuf);
       s->tmpbuf = NULL;
@@ -2986,14 +3127,16 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
 }
 
 int
-PutHeader(Sound *s, Tcl_Interp *interp, int length)
+PutHeader(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[],
+	  int length)
 {
   Snack_FileFormat *ff;
 
   for (ff = snackFileFormats; ff != NULL; ff = ff->nextPtr) {
     if (strcmp(s->fileType, ff->name) == 0) {
       if (ff->putHeaderProc != NULL) {
-	return (ff->putHeaderProc)(s, interp, s->rwchan, NULL, length);
+	return (ff->putHeaderProc)(s, interp, s->rwchan, NULL, objc, objv,
+				   length);
       }
       break;
     }
@@ -3063,18 +3206,18 @@ Snack_AddFileFormat(char *name, guessFileTypeProc *guessProc,
   if (ff == NULL) {
     return TCL_ERROR;
   }
-  ff->name = name;
-  ff->guessProc  = guessProc;
+  ff->name          = name;
+  ff->guessProc     = guessProc;
   ff->getHeaderProc = getHeadProc;
-  ff->extProc    = extProc;
+  ff->extProc       = extProc;
   ff->putHeaderProc = putHeadProc;
-  ff->openProc   = openProc;
-  ff->closeProc  = closeProc;
-  ff->readProc   = readProc;
-  ff->writeProc  = writeProc;
-  ff->seekProc   = seekProc;
-  ff->nextPtr    = snackFileFormats;
-  snackFileFormats = ff;
+  ff->openProc      = openProc;
+  ff->closeProc     = closeProc;
+  ff->readProc      = readProc;
+  ff->writeProc     = writeProc;
+  ff->seekProc      = seekProc;
+  ff->nextPtr       = snackFileFormats;
+  snackFileFormats  = ff;
 
   return TCL_OK;
 }
@@ -3085,6 +3228,7 @@ Snack_FileFormat snackRawFormat = {
   GetRawHeader,
   NULL,
   PutRawHeader,
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -3106,6 +3250,7 @@ Snack_FileFormat snackMp3Format = {
   NULL,
   SeekMP3File,
   FreeMP3Header,
+  ConfigMP3Header,
   (Snack_FileFormat *) NULL
 };
 
@@ -3115,6 +3260,7 @@ Snack_FileFormat snackSmpFormat = {
   GetSmpHeader,
   ExtSmpFile,
   PutSmpHeader,
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -3136,6 +3282,7 @@ Snack_FileFormat snackCslFormat = {
   NULL,
   NULL,
   NULL,
+  NULL,
   (Snack_FileFormat *) NULL
 };
 
@@ -3150,7 +3297,8 @@ Snack_FileFormat snackSdFormat = {
   NULL,
   NULL,
   NULL,
-  NULL,
+  FreeSdHeader,
+  ConfigSdHeader,
   (Snack_FileFormat *) NULL
 };
 
@@ -3160,6 +3308,7 @@ Snack_FileFormat snackAiffFormat = {
   GetAiffHeader,
   ExtAiffFile,
   PutAiffHeader,
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -3181,6 +3330,7 @@ Snack_FileFormat snackAuFormat = {
   NULL,
   NULL,
   NULL,
+  NULL,
   (Snack_FileFormat *) NULL
 };
 
@@ -3190,6 +3340,7 @@ Snack_FileFormat snackWavFormat = {
   GetWavHeader,
   ExtWavFile,
   PutWavHeader,
+  NULL,
   NULL,
   NULL,
   NULL,
@@ -3411,8 +3562,8 @@ GetSample(SnackLinkedFileInfo *infoPtr, int index)
   }
 }
 
-SnackFileFormat *
+Snack_FileFormat *
 Snack_GetFileFormats()
 {
-  return (SnackFileFormat *) snackFileFormats;
+  return snackFileFormats;
 }

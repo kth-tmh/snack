@@ -6,7 +6,7 @@ exec wish8.3 "$0" "$@"
 # It needs the freewrap tool which can be downloaded from
 # http://freewrap.sourceforge.net/
 # Edit this file to set the freewrap variable below according to
-# your install path.
+# your freewrap install path.
 
 
 pack [label .l1 -text "This utility creates\nstand-alone executables"]
@@ -14,7 +14,7 @@ update
 
 # Get the Snack package's directory
 
-package require -exact snack 2.0
+package require -exact snack 2.1
 set tmp [package ifneeded snack [package provide snack]]
 set tmp [lindex [lindex [split $tmp ";"] 0] end]
 set snackdir [file dirname $tmp]
@@ -22,7 +22,8 @@ set snackdir [file dirname $tmp]
 switch -glob [string tolower $tcl_platform(platform)] {
  windows {
 # Customize freewrap install dir here
-  set freewrap E:/freewrap44/freewrap.exe
+# freewrap.exe is included in the Windows binary distribution
+  set freewrap [file join [pwd] freewrap.exe]
   set tmpdir C:/temp
   regsub -all {\\} $tmpdir / tmpdir
   set wrapdir [file join $tmpdir wrap]
@@ -30,7 +31,8 @@ switch -glob [string tolower $tcl_platform(platform)] {
  }
  unix {
 # Customize freewrap install dir here
-  set freewrap ~/bin/freewrap
+# freewrap executable for Linux-i386 is included in the source distribution
+  set freewrap [file join [pwd] freewrap]
   set tmpdir /tmp
   set wrapdir [file join $tmpdir wrap]
   set appextension ""
@@ -39,12 +41,12 @@ switch -glob [string tolower $tcl_platform(platform)] {
   error "unknown os $tcl_platform(os)"
  }
 }
-
+if {[info exists argv] == 0} { set argv "" }
 set mainprog [file rootname [lindex $argv 0]]
 if {$mainprog == ""} {
  set mainprog [file rootname [lindex [file split \
 	 [tk_getOpenFile -filetypes {{{Tcl scripts} {.tcl}}}]] end]]
- if {$mainprog == ""} exit
+  if {$mainprog == ""} return
 }
 
 if {[file executable $freewrap] == 0} {
@@ -66,6 +68,20 @@ foreach {dir list} [list $wrapdir/snack \
   file copy $file $dir
  }
 }
+
+# Copy standard extension packages if they are needed
+
+set f0 [open ${mainprog}.tcl r]
+while {[eof $f0] == 0} {
+  set line [gets $f0]
+  if {[string match {*package require*snackogg*} $line]} {
+    file copy $snackdir/libsnackogg[info sharedlibextension] $dir
+  }
+  if {[string match {*package require*snacksphere*} $line]} {
+    file copy $snackdir/libsnacksphere[info sharedlibextension] $dir
+  }
+}
+close $f0
 
 # copy script files to the wrap directory, and insert magic code
 
@@ -148,4 +164,5 @@ file copy -force $wrapdir/${mainprog}$appextension $appdir
 
 catch {exec chmod -R 777 $wrapdir}
 catch {tk_messageBox -message "Created: ${mainprog}$appextension"}
+cd $appdir
 exit
