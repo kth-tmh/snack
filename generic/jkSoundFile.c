@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2002 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2003 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -875,7 +875,7 @@ WriteSound(writeSamplesProc *writeProc, Sound *s, Tcl_Interp *interp,
 	    if (littleEndian) {
 	      offset = 1;
 	    } else {
-	      offset = 0;
+	      offset = 1;
 	    }
 	    pack.i = (int) is;
 	    if (Tcl_Write(ch, (char *) &pack.c[offset], 3) == -1) {
@@ -1078,7 +1078,9 @@ typedef enum {
   GUESS_ALAW,
   GUESS_MULAW,
   GUESS_LIN8OFFSET,
-  GUESS_LIN8
+  GUESS_LIN8,
+  GUESS_LIN24,
+  GUESS_LIN24S
 } sampleEncoding;
 
 #define GUESS_FFT_LENGTH 512
@@ -1090,6 +1092,7 @@ GuessEncoding(Sound *s, unsigned char *buf, int len) {
   float energyLIN16 = 0.0, energyLIN16S = 0.0;
   float energyMULAW = 0.0, energyALAW = 0.0;
   float energyLIN8  = 0.0, energyLIN8O = 0.0, minEnergy;
+  float energyLIN24 = 0.0, energyLIN24S = 0.0;
   float fft[GUESS_FFT_LENGTH];
   float totfft[GUESS_FFT_LENGTH];
   float hamwin[GUESS_FFT_LENGTH];
@@ -1116,6 +1119,25 @@ GuessEncoding(Sound *s, unsigned char *buf, int len) {
     energyLIN8O  += (float) sampleLIN8O  * (float) sampleLIN8O;
     energyLIN8   += (float) sampleLIN8   * (float) sampleLIN8;
   }
+
+  for (i = 0; i < len / 2; i+=3) {
+    union {
+      char c[sizeof(int)];
+      int s;
+    } sampleLIN24, sampleLIN24S;
+
+    sampleLIN24.c[0] = (char)buf[i];
+    sampleLIN24.c[1] = (char)buf[i+1];
+    sampleLIN24.c[2] = (char)buf[i+2];
+    sampleLIN24S.c[2] = (char)buf[i];
+    sampleLIN24S.c[1] = (char)buf[i+1];
+    sampleLIN24S.c[0] = (char)buf[i+2];
+
+    sampleLIN24.s /= 65536;
+    sampleLIN24S.s /= 65536;
+    energyLIN24  += (float) sampleLIN24.s * (float) sampleLIN24.s;
+    energyLIN24S += (float) sampleLIN24S.s * (float) sampleLIN24S.s;
+  }
   
   format = GUESS_LIN16;
   minEnergy = energyLIN16;
@@ -1140,7 +1162,15 @@ GuessEncoding(Sound *s, unsigned char *buf, int len) {
     format = GUESS_LIN8;
     minEnergy = energyLIN8;
   }
-  
+  /*if (energyLIN24 < minEnergy) {
+    format = GUESS_LIN24;
+    minEnergy = energyLIN24;
+  }
+  if (energyLIN24S < minEnergy) {
+    format = GUESS_LIN24S;
+    minEnergy = energyLIN24S;
+  }
+  printf("AA %f %f %f %f\n", energyLIN16, energyLIN16S, energyLIN24, energyLIN24S);*/
   switch (format) {
   case GUESS_LIN16:
     s->swap = 0;
@@ -1197,6 +1227,16 @@ GuessEncoding(Sound *s, unsigned char *buf, int len) {
     if (s->guessRate) {
       s->samprate = DEFAULT_LIN8_RATE;
     }
+    break;
+  case GUESS_LIN24:
+    s->swap = 0;
+    s->encoding = LIN24;
+    s->sampsize = 4;
+    break;
+  case GUESS_LIN24S:
+    s->swap = 1;
+    s->encoding = LIN24;
+    s->sampsize = 4;
     break;
   }
 
@@ -1260,8 +1300,8 @@ GetRawHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   if (s->debug > 2) Snack_WriteLog("    Reading RAW header\n");
 
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    s->length = (Tcl_Tell(ch) - s->skipBytes) / (s->sampsize * s->nchannels);
+    TCL_SEEK(ch, 0, SEEK_END);
+    s->length = (TCL_TELL(ch) - s->skipBytes) / (s->sampsize * s->nchannels);
   }
   if (obj != NULL) {
     if (useOldObjAPI) {
@@ -1338,8 +1378,8 @@ GetSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   s->swap = 0;
 
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    s->length = (Tcl_Tell(ch) - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
+    TCL_SEEK(ch, 0, SEEK_END);
+    s->length = (TCL_TELL(ch) - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
   }
   if (obj != NULL) {
     if (useOldObjAPI) {
@@ -1387,7 +1427,7 @@ PutSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     i += (int) sprintf(&buf[i], "msb=first\r\n");
   }
   i += (int) sprintf(&buf[i], "nchans=%d\r\n", s->nchannels);
-  i += (int) sprintf(&buf[i], "preemph=none\r\nborn=snack\r\n=\r\n%c%c ", 0,4);
+  i += (int) sprintf(&buf[i],"preemph=none\r\nborn=snack\r\n=\r\n%c%c%c", 0,4,26);
 
   for (;i < NIST_HEADERSIZE; i++) buf[i] = 0;
 
@@ -1423,12 +1463,14 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   int datastart, len, i, j;
   double freq = 16000.0;
   double start = 0.0;
+  int first = 1;
 
   if (s->debug > 2) Snack_WriteLog("    Reading SD header\n");
 
   datastart = GetBELong(buf, 8);
+  s->nchannels = GetBELong(buf, 144);
 
-  for (i = 0; i < 900; i++) { 
+  for (i = 0; i < s->firstNRead; i++) { 
     if (strncasecmp("record_freq", &buf[i], strlen("record_freq")) == 0) {
       i = i + 18;
       if (littleEndian) {
@@ -1441,7 +1483,8 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       }
       memcpy(&freq, &buf[i], 8);
     }
-    if (strncasecmp("start_time", &buf[i], strlen("start_time")) == 0) {
+    if (strncasecmp("start_time", &buf[i], strlen("start_time")) == 0 && first) {
+      first = 0;
       i = i + 18;
       if (littleEndian) {
 	for (j = 0; j < 4; j++) {
@@ -1474,13 +1517,12 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   
   s->encoding = LIN16;
   s->sampsize = 2;
-  s->nchannels = 1;
   s->samprate = (int) freq;
   s->loadOffset = 0; /*(int) (start * s->samprate + 0.5);*/
 
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    len = Tcl_Tell(ch);
+    TCL_SEEK(ch, 0, SEEK_END);
+    len = TCL_TELL(ch);
     if (len == 0 || len < datastart) {
       Tcl_AppendResult(interp, "Failed reading SD header", NULL);
       return TCL_ERROR;
@@ -1499,6 +1541,7 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 #endif
     }
   }
+  s->length /= s->nchannels;
   s->headSize = datastart;
   SwapIfLE(s);
 
@@ -1510,7 +1553,7 @@ ConfigSdHeader(Sound *s, Tcl_Interp *interp, int objc,
                 Tcl_Obj *CONST objv[])
 {
   int index;
-  static char *optionStrings[] = {
+  static CONST84 char *optionStrings[] = {
     "-start_time", NULL
   };
   enum options {
@@ -1627,8 +1670,8 @@ GetAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   nsamp = GetBELong(buf, 8) / (s->sampsize * s->nchannels);
 
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    nsampfile = (Tcl_Tell(ch) - hlen) / (s->sampsize * s->nchannels);
+    TCL_SEEK(ch, 0, SEEK_END);
+    nsampfile = (TCL_TELL(ch) - hlen) / (s->sampsize * s->nchannels);
     if (nsampfile < nsamp || nsamp <= 0) {
       nsamp = nsampfile;
     }
@@ -1848,8 +1891,8 @@ GetWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   
   s->headSize = i + 8;
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    nsampfile = (Tcl_Tell(ch) - s->headSize) / (s->sampsize * s->nchannels);
+    TCL_SEEK(ch, 0, SEEK_END);
+    nsampfile = (TCL_TELL(ch) - s->headSize) / (s->sampsize * s->nchannels);
     if (nsampfile < nsamp || nsamp == 0) {
       nsamp = nsampfile;
     }
@@ -2254,8 +2297,8 @@ GetCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   
   s->headSize = i + 8;
   if (ch != NULL) {
-    Tcl_Seek(ch, 0, SEEK_END);
-    nsampfile = (Tcl_Tell(ch) - s->headSize) / (s->sampsize * s->nchannels);
+    TCL_SEEK(ch, 0, SEEK_END);
+    nsampfile = (TCL_TELL(ch) - s->headSize) / (s->sampsize * s->nchannels);
     if (nsampfile < nsamp || nsamp == 0) {
       nsamp = nsampfile;
     }
@@ -2397,7 +2440,7 @@ SnackSeekFile(seekProc *seekProc, Sound *s, Tcl_Interp *interp,
 	      Tcl_Channel ch, int pos)
 {
   if (seekProc == NULL) {
-    return(Tcl_Seek(ch, s->headSize + pos * s->sampsize * s->nchannels,
+    return(TCL_SEEK(ch, s->headSize + pos * s->sampsize * s->nchannels,
 		    SEEK_SET));
   } else {
     return((seekProc)(s, interp, ch, pos));
@@ -2506,7 +2549,7 @@ readCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
 {
   char *filetype;
   int arg, startpos = 0, endpos = -1;
-  static char *subOptionStrings[] = {
+  static CONST84 char *subOptionStrings[] = {
     "-rate", "-frequency", "-skiphead", "-byteorder", "-channels",
     "-encoding", "-format", "-start", "-end", "-fileformat",
     "-guessproperties", "-progress", NULL
@@ -2674,7 +2717,8 @@ readCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
 }
 
 void
-Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[], char **subOptionStrings,
+Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[],
+		    CONST84 char **subOptionStrings,
 		    int *newobjc, Tcl_Obj **newobjv)
 {
   int arg, n = 0;
@@ -2702,7 +2746,7 @@ writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   int startpos = 0, endpos = s->length, arg, len, newobjc;
   char *string, *filetype = NULL;
   Tcl_Obj **newobjv = NULL;
-  static char *subOptionStrings[] = {
+  static CONST84 char *subOptionStrings[] = {
     "-start", "-end", "-fileformat", "-progress", "-byteorder", NULL
   };
   enum subOptions {
@@ -2839,7 +2883,7 @@ dataCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     Tcl_Obj *new = Tcl_NewObj();
     char *filetype = s->fileType;
     int arg, len, startpos = 0, endpos = s->length;
-    static char *subOptionStrings[] = {
+    static CONST84 char *subOptionStrings[] = {
       "-fileformat", "-start", "-end", "-byteorder",
       NULL
     };
@@ -2916,7 +2960,7 @@ dataCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   } else { /* variable -> sound */
     int arg, startpos = 0, endpos = -1;
     char *filetype;
-    static char *subOptionStrings[] = {
+    static CONST84 char *subOptionStrings[] = {
       "-rate", "-frequency", "-skiphead", "-byteorder",
       "-channels", "-encoding", "-format", "-start", "-end", "-fileformat",
       "-guessproperties", NULL
@@ -3475,8 +3519,21 @@ GetSample(SnackLinkedFileInfo *infoPtr, int index)
 	  nRead = Tcl_Read(infoPtr->linkCh, b, size * s->sampsize);
 	  infoPtr->validSamples = nRead / s->sampsize;
 	} else {
-	  nRead = (ff->readProc)(s, s->interp, infoPtr->linkCh, NULL,
-				 junkBuffer, size);
+	  int tries=10,maxt=tries;
+	  /* TFW: Workaround for streaming issues:
+	   * Make sure we get something from the channel if possible
+	   * on some (e.g. ogg) streams, we sometime get a -1 back for length
+	   * typically on the second retry we get it right.
+           */
+	  for (;tries>0;tries--) {
+	    nRead = (ff->readProc)(s, s->interp, infoPtr->linkCh, NULL,
+				   junkBuffer, size);
+	    if (nRead > 0) break;
+	  }
+	  if (s->debug > 1 && tries < maxt) {
+	    Snack_WriteLogInt("  Read Tries", maxt-tries);
+	    Snack_WriteLogInt("  Read Samples", nRead);
+	  }
 	  infoPtr->validSamples = nRead;
 	  memcpy(infoPtr->buffer, junkBuffer, nRead * sizeof(float));
 	}

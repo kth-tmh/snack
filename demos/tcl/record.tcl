@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 
-package require -exact snack 2.1
+package require -exact snack 2.2
 
 file delete _tmprec.wav
 snack::sound t -debug 0

@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 
-package require -exact snack 2.1
+package require -exact snack 2.2
 
 pack [canvas .c -height 200 -width 400]
 

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2002 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2003 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -47,11 +47,12 @@ char defaultOutDevice[MAX_DEVICE_NAME_LENGTH];
 char defaultInDevice[MAX_DEVICE_NAME_LENGTH];
 
 char *
-SnackStrDup(const char *str) {
+SnackStrDup(const char *str)
+{
   char *new = ckalloc(strlen(str)+1);
 
   if (new) {
-    strncpy(new, str, strlen(str)+1);
+    strcpy(new, str);
   }
 
   return new;
@@ -158,7 +159,7 @@ selectInCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 static int
 encodingsCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-  char *str = "Lin16 Mulaw Alaw Lin8offset Lin8 Lin24 Lin32 Float";
+  char *str = "Lin16 Mulaw Alaw Lin8offset Lin8 Lin24 Lin24packed Lin32 Float";
 
   Tcl_SetObjResult(interp, Tcl_NewStringObj(str, -1));
 
@@ -327,6 +328,12 @@ audioStopCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   if (wop == WRITE || wop == PAUSED) {
     for (p = soundQueue; p != NULL; p = p->next) {
       Snack_StopSound(p->sound, interp);
+      /*
+       * The soundQueue can be remooved during a stop, so check it
+       * otherwise p is garbage
+       */
+      if (soundQueue == NULL)
+	break;
     }
   }
 
@@ -347,7 +354,7 @@ audioPauseCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 int nAudioCommands   = NAUDIOCOMMANDS;
 int maxAudioCommands = MAXAUDIOCOMMANDS;
 
-char *audioCmdNames[MAXAUDIOCOMMANDS] = {
+CONST84 char *audioCmdNames[MAXAUDIOCOMMANDS] = {
   "outputDevices",
   "inputDevices",
   "selectOutput",

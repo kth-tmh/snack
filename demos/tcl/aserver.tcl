@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 
-package require -exact snack 2.1
+package require -exact snack 2.2
 # Try to load optional file format handler
 catch { package require snackogg }
 
@@ -20,7 +20,7 @@ proc Cmd { sock addr port } {
 	    puts $sock $s ;# return token for this job
 	    flush $sock
 	    $s configure -channel $sock -guessproperties yes
-	    $s play -command "[list close $sock]; set msg idle;$s destroy"
+	    $s play -command "close $sock; set msg idle;$s destroy"
 	    set msg playing
 	}
 	stop {

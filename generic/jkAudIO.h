@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2002 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2003 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -26,6 +26,10 @@
 extern "C" {
 #endif
 
+#ifndef CONST84
+#   define CONST84
+#endif
+
 #ifdef HPUX
 #  include <Alib.h>
 #endif
@@ -47,13 +51,17 @@ extern "C" {
 #  include <mmsystem.h>
 #  include <mmreg.h>
 #  include <dsound.h>
+#  include <ks.h>
+# ifdef WAVEFORMATEXTENSIBLE
+#  include <ksmedia.h>
+# endif
 #endif
 
 #ifdef IRIX
 #  include <audio.h>
 #endif
 
-#ifdef MAC
+#if defined(MAC) || defined(OS_X_CORE_AUDIO)
 
 /* We need to temporarily redefine several symbols used by an obsolete
  *  MacOS interface as they are also used by Snack */
@@ -64,7 +72,16 @@ extern "C" {
 #  define volumeCmd  volumeCmd_MacOS
 #  define pauseCmd   pauseCmd_MacOS
 
+#if defined(OS_X_CORE_AUDIO)
+#undef min
+#undef max
+#  include <CoreServices/CoreServices.h>
+#  include <CoreAudio/AudioHardware.h>
+#define min(a,b) ((a)<(b)?(a):(b))
+#define max(a,b) ((a)>(b)?(a):(b))
+#else
 #  include <Sound.h>
+#endif
 
 #  undef convertCmd
 #  undef soundCmd
@@ -84,6 +101,10 @@ extern "C" {
 #define INBUF_OVERLAP (0)
 
 #endif /* MAC */
+
+#ifdef ALSA
+#include <alsa/asoundlib.h>
+#endif
 
 typedef struct ADesc {
 
@@ -106,6 +127,13 @@ typedef struct ADesc {
   int    freq;
   int    convert;
   int    warm;
+#endif
+
+#ifdef ALSA
+  snd_pcm_t *handle;
+  int       freq;
+  long      nWritten;
+  long      nPlayed;
 #endif
 
 #ifdef Solaris
@@ -135,7 +163,8 @@ typedef struct ADesc {
   LPDIRECTSOUNDBUFFER lplpDsPB;
   unsigned int BufPos;
   int BufLen;
-  int written;
+  long written;
+  long lastWritten;
 #endif
 
 #ifdef IRIX
@@ -145,7 +174,7 @@ typedef struct ADesc {
   int count;
 #endif
 
-#ifdef MAC
+#if defined(MAC)/* || defined(OS_X_CORE_AUDIO)*/
   /* Fields for handling output */
   SndChannelPtr schn;
   SndCommand	  scmd;
@@ -170,6 +199,16 @@ typedef struct ADesc {
   int underruns;
 #endif /* MAC */
 
+#ifdef OS_X_CORE_AUDIO
+  AudioDeviceID	device;
+  UInt32 deviceBufferSize;
+  AudioStreamBasicDescription deviceFormat;
+  int rpos, wpos;
+  double time;
+  int tot;
+  int encoding;
+#endif /* OS_X_CORE_AUDIO */
+
   int bytesPerSample;
   int nChannels;
   int mode;
@@ -184,16 +223,17 @@ extern int SnackGetMixerDevices(char **arr, int n);
 extern void SnackAudioInit();
 extern void SnackAudioFree();
 extern int  SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
-			   int mode, int freq, int channels, int encoding);
+			   int mode, int freq, int channels,
+			   int encoding);
 extern int  SnackAudioClose(ADesc *A);
-extern int  SnackAudioPause(ADesc *A);
+extern long SnackAudioPause(ADesc *A);
 extern void SnackAudioResume(ADesc *A);
 extern void SnackAudioFlush(ADesc *A);
 extern void SnackAudioPost(ADesc *A);
 extern int  SnackAudioRead(ADesc *A, void *buf, int nSamples);
 extern int  SnackAudioWrite(ADesc *A, void *buf, int nSamples);
 extern int  SnackAudioReadable(ADesc *A);
-extern int  SnackAudioPlayed(ADesc *A);
+extern long SnackAudioPlayed(ADesc *A);
 extern int  SnackAudioWriteable(ADesc *A);
 
 extern int SnackAudioGetEncodings(char *device);
@@ -209,7 +249,8 @@ extern int  AGetPlayGain();
 extern void SnackMixerGetInputJackLabels(char *buf, int n);
 extern void SnackMixerGetOutputJackLabels(char *buf, int n);
 extern void SnackMixerGetInputJack(char *buf, int n);
-extern int  SnackMixerSetInputJack(Tcl_Interp *interp, char *jack, char *status);
+extern int  SnackMixerSetInputJack(Tcl_Interp *interp, char *jack,
+				   CONST84 char *status);
 extern void SnackMixerGetOutputJack(char *buf, int n);
 extern void SnackMixerSetOutputJack(char *jack, char *status);
 extern void SnackMixerGetChannelLabels(char *mixer, char *buf, int n);
@@ -239,6 +280,7 @@ extern int  SnackGetOutDevices(char **arr, int n);
 #define LIN32        7
 #define SNACK_FLOAT  8
 #define SNACK_DOUBLE 9
+#define LIN24PACKED 10
 
 #define CAPABLEN 100
 
@@ -254,7 +296,7 @@ typedef struct MixerLink {
   char *mixer;
   char *mixerVar;
   char *jack;
-  char *jackVar;
+  CONST84 char *jackVar;
   int channel;
 } MixerLink;
 

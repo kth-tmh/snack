@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 
-package require -exact snack 2.1
+package require -exact snack 2.2
 
 set f [snack::filter generator 440.0]
 snack::sound s

@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 
-package require -exact snack 2.1
+package require -exact snack 2.2
 
 snack::sound s1 -channels 2
 set leftMap [snack::filter map 1 0 0 0]
@@ -18,9 +18,9 @@ pack [frame .fb] -side bottom
 pack [button .fb.a -bitmap snackPlay -command Play] -side left
 pack [button .fb.b -bitmap snackStop -command "snack::audio stop"] -side left
 
-set left(freq) 440.0
+set left(freq) 1000.0
 set left(ampl) 20000
-set right(freq) 440.0
+set right(freq) 2200.0
 set right(ampl) 20000
 
 pack [frame .left] -expand yes -fill both -side top

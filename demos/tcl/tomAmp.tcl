@@ -1,6 +1,6 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.3 "$0" "$@"
+exec wish8.4 "$0" "$@"
 # derived from Snack snamp.tcl demo player by Tom Wilkason
 #
 global taFiles tomAmp
@@ -14,7 +14,7 @@ set tomAmp(elapsed) 0
 set tomAmp(current) {}
 set tomAmp(currentMP3) {}
 ;# Setup sound settings
-package require -exact snack 2.1
+package require -exact snack 2.2
 # Buttons
 option add *font {Helvetica 10 bold}
 option add *Button.activeBackground yellow

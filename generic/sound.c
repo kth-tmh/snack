@@ -21,6 +21,7 @@
 
 #include "snack.h"
 #include "tcl.h"
+#include <string.h>
 
 #if defined(__WIN32__)
 #  define WIN32_LEAN_AND_MEAN
@@ -49,7 +50,6 @@ DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)
 #endif
 
 #ifdef MAC
-#include <string.h>
 int main (void)
 {
 	return 0;
@@ -67,6 +67,7 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
 {
   int len;
   char *str;
+  CONST84 char *patchLevelStr;
 
   if (objc > 1) {
     if (Tcl_GetIntFromObj(interp, objv[1], &debugLevel) != TCL_OK)
@@ -97,9 +98,9 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     strcpy(snackDumpFile, str);
   }
   if (debugLevel > 0) {
-    str = Tcl_GetVar(interp, "sound::patchLevel", TCL_GLOBAL_ONLY);
+    patchLevelStr = Tcl_GetVar(interp, "sound::patchLevel", TCL_GLOBAL_ONLY);
     Tcl_Write(snackDebugChannel, "Sound patch level: ", 19);
-    Tcl_Write(snackDebugChannel, str, strlen(str));
+    Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
     Tcl_Write(snackDebugChannel, "\n", 1);
     Tcl_Flush(snackDebugChannel);
   }
@@ -131,15 +132,19 @@ extern Tcl_HashTable *filterHashTable;
 #define Tcl_InitHashTable (tclStubsPtr->tcl_InitHashTable)
 #endif
 
+extern char defaultOutDevice[];
+int defaultSampleRate = 16000;
+
 int
 Sound_Init(Tcl_Interp *interp)
 {
-  char *version;
+  CONST84 char *version;
   Tcl_HashTable *soundHashTable;
   union {
     char c[sizeof(short)];
     short s;
   } order;
+  char rates[100];
   
 #ifdef USE_TCL_STUBS
   if (Tcl_InitStubs(interp, "8", 0) == NULL) {
@@ -232,6 +237,14 @@ Sound_Init(Tcl_Interp *interp)
   order.s = 1;
   if (order.c[0] == 1) {
     littleEndian = 1;
+  }
+
+  /* Determine a default sample rate for this machine, usually 16kHz. */
+  
+  SnackAudioGetRates(defaultOutDevice, rates, 100);
+  if (strstr(rates, "16000") != NULL ||
+      sscanf(rates, "%d", &defaultSampleRate) != 1) {
+    defaultSampleRate = 16000;
   }
 
   return TCL_OK;
