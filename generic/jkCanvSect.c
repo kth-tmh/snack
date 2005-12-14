@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2002 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2005 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -462,6 +462,8 @@ GetFloatMonoSigSect(SnackItemInfo *siPtr,SnackLinkedFileInfo *info,
   }
 }
 
+extern void Snack_PowerSpectrum(float *z);
+
 void
 ComputeSection(Tk_Item *itemPtr)
 {
@@ -601,7 +603,7 @@ ComputeSection(Tk_Item *itemPtr)
 	}
       }
       
-      Snack_DBPowerSpectrum(sectPtr->xfft);
+      Snack_PowerSpectrum(sectPtr->xfft);
       
       for (i = 0; i < fftlen/2; i++) {
 	sectPtr->ffts[i] += sectPtr->xfft[i];
@@ -611,6 +613,15 @@ ComputeSection(Tk_Item *itemPtr)
     for (i = 0; i < fftlen/2; i++) {
       sectPtr->ffts[i] = sectPtr->ffts[i] / (float) n;
     }
+    
+    for (i = 1; i < fftlen/2; i++) {
+      if (sectPtr->ffts[i] < SNACK_INTLOGARGMIN)
+	sectPtr->ffts[i] = SNACK_INTLOGARGMIN;
+      sectPtr->ffts[i] = (float)(SNACK_DB*log(sectPtr->ffts[i]) - SNACK_CORRN);
+    }
+    if (sectPtr->ffts[0] < SNACK_INTLOGARGMIN)
+      sectPtr->ffts[0] = SNACK_INTLOGARGMIN;
+    sectPtr->ffts[0] = (float)(SNACK_DB*log(sectPtr->ffts[0]) - SNACK_CORR0);
   }
   if (storeType != SOUND_IN_MEMORY) {
     CloseLinkedFile(&info);
@@ -728,9 +739,7 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   GC newGC;
   unsigned long mask;
   int doCompute = 0;
-#if defined(MAC) || defined(MAC_OSX_TCL)
-  int i;
-#endif
+  int i, j;
 
   if (argc == 0) return TCL_OK;
 
@@ -739,6 +748,15 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 			 (char *) sectPtr, flags) != TCL_OK) return TCL_ERROR;
 
   if (sectPtr->debug) Snack_WriteLog("Enter ConfigureSection\n");
+
+  for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
+    for (j = 0; j < argc; j += 2) {
+      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
+	break;
+      }
+    }
+  }
 
 #if defined(MAC) || defined(MAC_OSX_TCL)
   for (i = 0; i < argc; i++) {
@@ -918,7 +936,7 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     doCompute = 1;
   }
   sectPtr->si.windowType = sectPtr->si.windowTypeSet;
-
+  
   if (doCompute) {
     sectPtr->nPoints = sectPtr->si.fftlen / 2;
     sectPtr->si.RestartPos = sectPtr->ssmp;
@@ -950,6 +968,10 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   
   if (ComputeSectionCoords(itemPtr) != TCL_OK) {
     return TCL_ERROR;
+  }
+  
+  for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
+    configSpecs[i].specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
   }
   
   if (sectPtr->debug) Snack_WriteLog("Exit ConfigureSection\n");

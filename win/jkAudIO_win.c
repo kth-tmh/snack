@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 1997-2003 Kare Sjolander <kare@speech.kth.se>
+ * Copyright (C) 1997-2004 Kare Sjolander <kare@speech.kth.se>
  *
  * This file is part of the Snack Sound Toolkit.
  * The latest version can be found at http://www.speech.kth.se/snack/
@@ -20,13 +20,14 @@
  */
 
 #include "tcl.h"
-#include "jkAudIO.h"
-#include "jkSound.h"
+#include "snack.h"
 #include <stdio.h>
 #include <fcntl.h>
 #ifndef _MSC_VER
 #include <unistd.h>
 #endif
+
+#include <windows.h>
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
@@ -35,12 +36,15 @@
 
 #define NBUFS 64
 
+extern int eround();
+
 static HWAVEOUT      hWaveOut;
 static HWAVEIN       hWaveIn;
 static HMIXER        hMixer;
 static WAVEFORMATEX  wFormatIn;
 #ifdef WAVEFORMATEXTENSIBLE
  static WAVEFORMATEXTENSIBLE  wFormatIn2;
+ static WAVEFORMATEXTENSIBLE  wFormatOut2;
 #endif
 static WAVEHDR       waveHdrIn[NBUFS];
 static char          *blockIn[NBUFS];
@@ -69,21 +73,21 @@ struct MixerLink mixerLinks[SNACK_NUMBER_MIXERS][2];
 static int selectedMixer = 0;
 
 static char *outDeviceList[MAX_NUM_DEVICES];
-static numOutDevs = 0;
+static int numOutDevs = 0;
 static char *inDeviceList[MAX_NUM_DEVICES];
-static numInDevs = 0;
+static int numInDevs = 0;
 static char *mixerDeviceList[MAX_NUM_DEVICES];
-static numMixDevs = 0;
+static int numMixDevs = 0;
 
 #include <dsound.h>
 #define DSBCAPS_CTRLDEFAULT 0x000000E0
 
 static char *DSOutDeviceList[MAX_NUM_DEVICES];
-static GUID guidOut[4];
-static numDSOutDevs = 0;
+static GUID guidOut[MAX_NUM_DEVICES];
+static int numDSOutDevs = 0;
 static char *DSInDeviceList[MAX_NUM_DEVICES];
-static GUID guidIn[4];
-static numDSInDevs = 0;
+static GUID guidIn[MAX_NUM_DEVICES];
+static int numDSInDevs = 0;
 
 /*
  * The following structure contains pointers to all of the DirectSound API
@@ -102,10 +106,10 @@ static struct {
 					      LPVOID lpVoid);
 } ds;
 
-#define NSECS 3
+#define NSECS 5
 
 static int useDSound = 0;
-EXTERN HINSTANCE snackHInst;
+extern HINSTANCE snackHInst;
 static WNDCLASSA windowClass;
 static HWND snackHwnd = NULL;
 HINSTANCE hDSoundInstance = NULL;
@@ -117,6 +121,9 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	       int mode, int freq, int nchannels, int encoding)
 {
   int i, devIndex = -1;
+  Tcl_Obj *dscValue,*dsbValue;
+  int dscFlag = DSSCL_NORMAL; /*DSSCL_PRIORITY;*/
+  int dsbFlag = DSBCAPS_GLOBALFOCUS; /* DSBCAPS_STICKYFOCUS;*/
 
   if (A->debug > 1) Snack_WriteLogInt("  Enter SnackAudioOpen", mode);
 
@@ -162,11 +169,11 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
     }
     break; 
   }
-  
+  if (devIndex > 0 && useDSound == 0) devIndex--;
+ 
   if (A->debug > 2) Snack_WriteLogInt("    device", devIndex);
 
   if (useDSound) {
-    int res = 0;
     HRESULT hr;
     DSCBCAPS dscbcaps;
 
@@ -271,7 +278,22 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 
       memset(&A->dsbdesc, 0, sizeof(DSBUFFERDESC)); 
       A->dsbdesc.dwSize = sizeof(DSBUFFERDESC); 
-      A->dsbdesc.dwFlags = DSBCAPS_CTRLDEFAULT | DSBCAPS_STICKYFOCUS; 
+
+      dsbValue = Tcl_GetVar2Ex(interp,"DSBCAPS_FLAG",0,TCL_LEAVE_ERR_MSG|TCL_GLOBAL_ONLY);
+      if (dsbValue != NULL) {
+         Tcl_GetIntFromObj(interp, dsbValue, &dsbFlag);
+         if (A->debug > 0) {
+            Snack_WriteLogInt("    dwFlags", dsbFlag);
+         }
+      } else {
+         if (A->debug > 1) {
+            Snack_WriteLogInt("    dwFlags error", dsbFlag);
+         }
+      }
+
+      /*A->dsbdesc.dwFlags = DSBCAPS_CTRLDEFAULT | DSBCAPS_STICKYFOCUS;*/
+      A->dsbdesc.dwFlags = DSBCAPS_CTRLDEFAULT | dsbFlag ;
+
       A->dsbdesc.dwBufferBytes = NSECS * A->pcmwf.wf.nAvgBytesPerSec;
       A->dsbdesc.lpwfxFormat = (LPWAVEFORMATEX)&A->pcmwf;
 
@@ -284,8 +306,28 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	Tcl_AppendResult(interp, "Failed creating DirectSound object.", NULL);
 	return TCL_ERROR; 
       }
-      hr = IDirectSound_SetCooperativeLevel(lpDirectSound, snackHwnd,
-					    DSSCL_PRIORITY);
+      /* *
+       * Get the flag from the script for the flag
+       #define DSSCL_NORMAL                0x00000001
+       #define DSSCL_PRIORITY              0x00000002 default
+       #define DSSCL_EXCLUSIVE             0x00000003
+       #define DSSCL_WRITEPRIMARY          0x00000004
+      */
+      dscValue = Tcl_GetVar2Ex(interp,"DSSCL_FLAG",0,TCL_LEAVE_ERR_MSG|TCL_GLOBAL_ONLY);
+      if (dscValue != NULL) {
+	Tcl_GetIntFromObj(interp, dscValue, &dscFlag);
+	if (A->debug > 0) {
+	  Snack_WriteLogInt("    IDirectSound_SetCooperativeLevel", dscFlag);
+	}
+      } else {
+	if (A->debug > 1) {
+	  Snack_WriteLogInt("    IDirectSound_SetCooperativeLevel error", dscFlag);
+	}
+      }
+      hr = IDirectSound_SetCooperativeLevel(lpDirectSound, snackHwnd,dscFlag);
+      
+      /* hr = IDirectSound_SetCooperativeLevel(lpDirectSound, snackHwnd,DSSCL_PRIORITY);*/
+
       if (hr != DS_OK) {
 	Tcl_AppendResult(interp, "Failed setting cooperative level.", NULL);
 	return TCL_ERROR; 
@@ -362,7 +404,7 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	wFormatIn.wFormatTag = WAVE_FORMAT_PCM;
 	break;
       }
-      if (mode == LIN24) {
+      if (encoding == LIN24) {
 #ifdef WAVEFORMATEXTENSIBLE
 	wFormatIn2.Format.nChannels       = nchannels;
 	wFormatIn2.Format.nSamplesPerSec  = freq;
@@ -425,6 +467,13 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	A->bytesPerSample = sizeof(short);
 	wFormatOut.wFormatTag = WAVE_FORMAT_PCM;
 	break;
+      case LIN24:
+	A->bytesPerSample = sizeof(int);
+#ifdef WAVEFORMATEXTENSIBLE
+	memset(&wFormatOut2, 0, sizeof(WAVEFORMATEXTENSIBLE));
+	wFormatOut2.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+#endif
+	break;
       case ALAW:
 	A->bytesPerSample = sizeof(char);
 	wFormatOut.wFormatTag = WAVE_FORMAT_ALAW;
@@ -438,32 +487,50 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	wFormatOut.wFormatTag = WAVE_FORMAT_PCM;
 	break;
       }
-      wFormatOut.nChannels       = nchannels;
-      wFormatOut.nSamplesPerSec  = freq;
-      wFormatOut.nAvgBytesPerSec = freq * A->bytesPerSample * nchannels;
-      wFormatOut.nBlockAlign     = A->bytesPerSample * nchannels;
-      wFormatOut.wBitsPerSample  = A->bytesPerSample * 8;
-      wFormatOut.cbSize          = 0;
-      
-      if (encoding == MULAW || encoding == ALAW) {
-	res = waveOutOpen(NULL, devIndex, (WAVEFORMATEX *)&wFormatOut,
-			  0, 0L, WAVE_FORMAT_QUERY);
-	if (res != MMSYSERR_NOERROR) {
-	  A->convert = encoding;
-	  A->bytesPerSample = sizeof(short);
-	  wFormatOut.wFormatTag = WAVE_FORMAT_PCM;
-	  wFormatOut.nAvgBytesPerSec = freq * A->bytesPerSample * nchannels;
-	  wFormatOut.nBlockAlign     = A->bytesPerSample * nchannels;
-	  wFormatOut.wBitsPerSample  = A->bytesPerSample * 8;
-	  if (A->debug > 2) Snack_WriteLogInt("    Converting", encoding);
-	} else {
-	  if (A->debug>1)
-	    Snack_WriteLogInt("    waveOutOpen error", res);
+      if (encoding == LIN24) {
+#ifdef WAVEFORMATEXTENSIBLE
+	wFormatOut2.Format.nChannels       = nchannels;
+	wFormatOut2.Format.nSamplesPerSec  = freq;
+	wFormatOut2.Format.nAvgBytesPerSec = freq * A->bytesPerSample * nchannels;
+	wFormatOut2.Format.nBlockAlign     = A->bytesPerSample * nchannels;
+	wFormatOut2.Format.wBitsPerSample  = A->bytesPerSample * 8;
+	wFormatOut2.Format.cbSize          = sizeof(WAVEFORMATEXTENSIBLE);
+	wFormatOut2.Samples.wValidBitsPerSample   = 3 * 8;
+	wFormatOut2.Samples.wValidBitsPerSample   = A->bytesPerSample * 8;
+	wFormatOut2.SubFormat              = KSDATAFORMAT_SUBTYPE_PCM;
+	wFormatOut2.dwChannelMask = 0;
+
+	res = waveOutOpen(&hWaveOut, devIndex, 
+			  (WAVEFORMATEX *)&wFormatOut2, 0, 0L, CALLBACK_NULL);
+#endif
+      } else {
+	wFormatOut.nChannels       = nchannels;
+	wFormatOut.nSamplesPerSec  = freq;
+	wFormatOut.nAvgBytesPerSec = freq * A->bytesPerSample * nchannels;
+	wFormatOut.nBlockAlign     = A->bytesPerSample * nchannels;
+	wFormatOut.wBitsPerSample  = A->bytesPerSample * 8;
+	wFormatOut.cbSize          = 0;
+
+	if (encoding == MULAW || encoding == ALAW) {
+	  res = waveOutOpen(NULL, devIndex, (WAVEFORMATEX *)&wFormatOut,
+			    0, 0L, WAVE_FORMAT_QUERY);
+	  if (res != MMSYSERR_NOERROR) {
+	    A->convert = encoding;
+	    A->bytesPerSample = sizeof(short);
+	    wFormatOut.wFormatTag = WAVE_FORMAT_PCM;
+	    wFormatOut.nAvgBytesPerSec = freq * A->bytesPerSample * nchannels;
+	    wFormatOut.nBlockAlign     = A->bytesPerSample * nchannels;
+	    wFormatOut.wBitsPerSample  = A->bytesPerSample * 8;
+	    if (A->debug > 2) Snack_WriteLogInt("    Converting", encoding);
+	  } else {
+	    if (A->debug>1)
+	      Snack_WriteLogInt("    waveOutOpen error", res);
+	  }
 	}
-      }
       
-      res = waveOutOpen(&hWaveOut, devIndex,
-			(WAVEFORMATEX *)&wFormatOut, 0, 0L, CALLBACK_NULL);
+	res = waveOutOpen(&hWaveOut, devIndex,
+			  (WAVEFORMATEX *)&wFormatOut, 0, 0L, CALLBACK_NULL);
+      }
       if (res) {
 	Tcl_AppendResult(interp, "waveOutOpen failed!", NULL);
 	return TCL_ERROR;
@@ -526,6 +593,7 @@ SnackAudioClose(ADesc *A)
 	IDirectSoundBuffer_Release(A->lplpDsb);
 	A->lplpDsb = NULL;
 	IDirectSound_Release(lpDirectSound);
+	A->mode = 0;
       }
       break;
     }
@@ -918,7 +986,7 @@ SnackAudioWrite(ADesc *A, void *buf, int nFrames)
     return(0); 
 
   } else { /* Windows multimedia library */
-    int res, i, nowrit = 1, size = nFrames * A->bytesPerSample * A->nChannels;
+    int res = 0, i, nowrit = 1, size = nFrames*A->bytesPerSample*A->nChannels;
 
     if (A->debug > 1) Snack_WriteLogInt("  Enter SnackAudioWrite", nFrames);
 
@@ -930,24 +998,21 @@ SnackAudioWrite(ADesc *A, void *buf, int nFrames)
   
     for (i = 0; i < NBUFS; i++) {
       if (waveHdrOut[i].dwFlags & WHDR_DONE) {
+     /* Increase Buffer if needed, use 2X needed to reduce future reallocs */
 	if (size > blockSizeOut[i]) {
-	  waveHdrOut[i].lpData = NULL;
+	  if (A->debug > 1)  Snack_WriteLogInt("    Reallocating Buffer", i);
+
 	  if (blockSizeOut[i]) {
 	    ckfree(blockOut[i]);
 	  }
 	  /*if (A->debug == 1) Snack_WriteLogInt("Allocing", size);*/
-	  blockOut[i] = ckalloc(size);
+	  blockOut[i] = ckalloc(size*2);
 	  if (!blockOut[i]) return(0);
-	  blockSizeOut[i] = size;
-	} else {
-	  /*if (A->debug == 1) Snack_WriteLogInt("Reusing", size);*/
-	  /*if (A->debug == 1) Snack_WriteLogInt("Block", i);*/
+	  blockSizeOut[i] = size*2;
 	}
-	if (waveHdrOut[i].lpData != NULL) {
-	  res=waveOutUnprepareHeader(hWaveOut, &waveHdrOut[i], sizeof(WAVEHDR));
-	  if (res != MMSYSERR_NOERROR && A->debug>1)
-	    Snack_WriteLogInt("    waveOutUnprepareHeader error", i);
-	}
+	res=waveOutUnprepareHeader(hWaveOut, &waveHdrOut[i], sizeof(WAVEHDR));
+	if (res != MMSYSERR_NOERROR && A->debug>1)
+	  Snack_WriteLogInt("    waveOutUnprepareHeader error", i);
 	
 	if (A->convert) {
 	  int j;
@@ -1082,6 +1147,12 @@ SnackAudioPlayed(ADesc *A)
     long nWritten;
     
     if (A->debug > 1) Snack_WriteLog("  Enter SnackAudioPlayed\n");
+    
+    if (A->lplpDsb == NULL) {
+      if (A->debug > 1)
+	Snack_WriteLog("  SnackAudioPlayed: No DirectSound Buffer\n");
+      return -1;
+    }
     
     hr = IDirectSoundBuffer_GetStatus(A->lplpDsb, &status);
     if (!(status && DSBSTATUS_PLAYING)) return(0);
@@ -1352,11 +1423,126 @@ SnackAudioFree()
   }
 }
 
+/* Get or Set the recording gain using the mixer API.
+ * If an error is encountered, -1 will be returned.
+ */
+
+static
+int AGetSetRecGain(int isset, int* value) {
+  HRESULT hr;
+  UINT mixerID, i;
+  HMIXER hMixer;
+
+  MIXERLINE mxl;
+  MIXERCONTROL mc;
+  MIXERLINECONTROLS mxlc;
+  DWORD count, m_dwChannels = 0, m_dwControlID = -1;
+  
+  MIXERCONTROLDETAILS mxcd;
+  MIXERCONTROLDETAILS_UNSIGNED mxdu;
+
+  /* numInDevs-1 is the device id as returned by waveInGetNumDevs() */
+  hr = mixerGetID((HMIXEROBJ) numInDevs-1,
+      &mixerID,
+      MIXER_OBJECTF_WAVEIN);
+  if (FAILED(hr)) {
+    return -1;
+  }
+
+  hr = mixerOpen(&hMixer, mixerID, 0, 0, MIXER_OBJECTF_MIXER);
+  if (FAILED(hr)) {
+    return -1;
+  }
+
+  /* Query for mixer line of voice input type */
+  mxl.cbStruct = sizeof(MIXERLINE);
+  mxl.dwComponentType = MIXERLINE_COMPONENTTYPE_DST_WAVEIN;
+
+  hr = mixerGetLineInfo((HMIXEROBJ)hMixer, &mxl, MIXER_GETLINEINFOF_COMPONENTTYPE);
+  if (FAILED(hr)) {
+    mixerClose(hMixer);
+    return -1;
+  }
+
+  /* Look for line of type MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE */
+  count = mxl.dwSource;
+  for(i = 0; i < count; i++)
+  {
+    mxl.dwSource = i;
+    mixerGetLineInfo((HMIXEROBJ)hMixer, &mxl, MIXER_GETLINEINFOF_SOURCE);
+    if (mxl.dwComponentType == MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE) {
+      m_dwChannels = mxl.cChannels;
+      mc.cbStruct = sizeof(MIXERCONTROL);
+      mxlc.cbStruct = sizeof(MIXERLINECONTROLS);
+      mxlc.dwLineID = mxl.dwLineID;
+      mxlc.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
+      mxlc.cControls = 1;
+      mxlc.cbmxctrl = sizeof(MIXERCONTROL);
+      mxlc.pamxctrl = &mc;
+      hr = mixerGetLineControls((HMIXEROBJ)hMixer, &mxlc, MIXER_GETLINECONTROLSF_ONEBYTYPE);
+      m_dwControlID = mc.dwControlID;
+      break;
+    };
+  }
+
+  /* Now have hMixer, m_dwChannels, and m_dwControlID */
+  
+  if (isset) {
+    /* Convert recording gain range from [0,100] to [0,65536] */
+    mxdu.dwValue = (DWORD) ((65536/100.0) * (*value));
+
+    mxcd.cMultipleItems = 0;
+    mxcd.cChannels = m_dwChannels;
+    mxcd.cbStruct = sizeof(MIXERCONTROLDETAILS);
+    mxcd.dwControlID = m_dwControlID;
+    mxcd.cbDetails = sizeof(MIXERCONTROLDETAILS_UNSIGNED);
+    mxcd.paDetails = &mxdu;
+    hr = mixerSetControlDetails((HMIXEROBJ)hMixer, &mxcd, MIXER_SETCONTROLDETAILSF_VALUE);	
+  } else {
+    mxcd.cMultipleItems = 0;
+    mxcd.cChannels = m_dwChannels;
+    mxcd.cbStruct = sizeof(MIXERCONTROLDETAILS);
+    mxcd.dwControlID = m_dwControlID;
+    mxcd.cbDetails = sizeof(MIXERCONTROLDETAILS_UNSIGNED);
+    mxcd.paDetails = &mxdu;
+    hr = mixerGetControlDetails((HMIXEROBJ)hMixer, &mxcd, MIXER_GETCONTROLDETAILSF_VALUE);	
+  }
+  if (FAILED(hr)) {
+    mixerClose(hMixer);
+    return -1;
+  }
+
+  if (!isset) {
+    /* Convert recording gain range from [0,65536] to [1,100] */
+    *value = eround((100.0 / 65536) * mxdu.dwValue);
+  }
+
+  hr = mixerClose(hMixer);
+  if (FAILED(hr)) {
+    return -1;
+  }
+
+  return 0;
+}
+
+/* Query or Set the current recording gain. This is simmilar to the output
+ * volume except that it applies to the microphone input source.
+ */
+
 void
 ASetRecGain(int gain)
 {
-  unsigned long g = min(max(gain, 0), 100);
+  unsigned int g = min(max(gain, 0), 100);
+  AGetSetRecGain(1, &g);
+}
 
+int
+AGetRecGain()
+{
+  unsigned int g = 100;
+  if (AGetSetRecGain(0, &g) == -1)
+      return -1;
+  return(g);
 }
 
 void
@@ -1368,28 +1554,20 @@ ASetPlayGain(int gain)
 }
 
 int
-AGetRecGain()
-{
-  int g = 0;
-
-  return(g);
-}
-
-int
 AGetPlayGain()
 {
-  int g = 0;
+  DWORD g = 0;
   
   waveOutGetVolume((HWAVEOUT) WAVE_MAPPER, &g);
   g = (g & 0xffff) / 655;
 
-  return(g);
+  return((int)g);
 }
 
 int
 SnackAudioGetEncodings(char *device)
 {
-  int res, pos = 0, i, devIndex = -1, lin16 = 0, lin24 = 0;
+  int res, i, devIndex = -1, lin16 = 0, lin24 = 0;
 
   if (device != NULL) {
     for (i = 0; i < numOutDevs; i++) {

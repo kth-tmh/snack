@@ -1243,6 +1243,7 @@ struct fadeFilter {
   float      msLength;
   int        length;
   int        pos;
+  float      floor;
 } fadeFilter;
 
 typedef struct fadeFilter *fadeFilter_t;
@@ -1258,7 +1259,7 @@ fadeConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
   char *typestr;
   double val;
 
-  if (objc == 3) {
+  if (objc == 3 || objc == 4) {
     typestr = Tcl_GetStringFromObj(objv[0], NULL);
     if (strcasecmp(typestr, "in") == 0) {
       mf->in = 1;
@@ -1288,6 +1289,14 @@ fadeConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
       return TCL_ERROR;
     }
     mf->msLength = (float) val;
+
+    if (objc == 4) {
+      if (Tcl_GetDoubleFromObj(interp, objv[3], &val) != TCL_OK) {
+	return TCL_ERROR;
+      }
+      mf->floor = (float) val;
+    }
+
   } else {
     
     /* Arguments need to be at least three */
@@ -1305,6 +1314,7 @@ fadeCreateProc(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   fadeFilter_t mf;
   
   mf = (fadeFilter_t) ckalloc(sizeof(fadeFilter));
+  mf->floor = 0.0;
 
   if (fadeConfigProc((Snack_Filter) mf, interp, objc, objv) != TCL_OK) {
     ckfree((char *) mf);
@@ -1340,25 +1350,27 @@ fadeFlowProc(Snack_Filter f, Snack_StreamInfo si, float *in, float *out,
       switch (mf->type) {
       case LINEAR:
 	if (mf->in) {
-	  factor = (float) mf->pos / mf->length;
+	  factor = (float) ((1.0 - mf->floor) * mf->pos / (mf->length - 1) + mf->floor);
 	} else {
-	  factor = (float) (1.0 - (float) mf->pos / mf->length);
+	  factor = (float) (1.0 - ((1.0 - mf->floor) * mf->pos / (mf->length - 1)));
 	}
 	break;
       case EXPONENTIAL:
 	if (mf->in) {
-	  factor = (float) exp(-10.0+10.0 * mf->pos / mf->length);
+	  factor = (float) (1.0 - mf->floor) * exp(-10.0+10.0 * mf->pos/(mf->length-1)) +mf->floor;
 	} else {
-	  factor = (float) exp(-10.0 * mf->pos / mf->length);
+	  factor = (float) (1.0 - mf->floor) * exp(-10.0 * mf->pos/(mf->length-1)) + mf->floor;
 	}
 	break;
       case LOGARITHMIC:
 	if (mf->in) {
-	  factor = (float) (0.5 + 0.5 * log(EXP_MINUS_1 + (EULER - EXP_MINUS_1)
-				    * ((float) mf->pos / mf->length)));
+	  factor = (float) (1.0 - mf->floor) * (0.5 + 0.5 *
+				    log(EXP_MINUS_1 + (EULER - EXP_MINUS_1)
+				  * (float) mf->pos / (mf->length-1))) + mf->floor;
 	} else {
-	  factor = (float) (0.5 + 0.5 * log(EXP_MINUS_1 + (EULER - EXP_MINUS_1)
-				    * (1.0-(float) mf->pos / mf->length)));
+	  factor = (float) (1.0 - mf->floor) * (0.5 + 0.5 * 
+				    log(EXP_MINUS_1 + (EULER - EXP_MINUS_1)
+			      * (1.0-(float) mf->pos / (mf->length-1)))) + mf->floor;
 	}
 	break;
       }
