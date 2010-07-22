@@ -125,6 +125,12 @@ iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
       return TCL_ERROR;
     }
     
+    if (arg + 1 == objc) {
+      Tcl_AppendResult(interp, "No argument given for ",
+		       optionStrings[index], " option", (char *) NULL);
+      return TCL_ERROR;
+    }
+    
     switch ((enum options) index) {
       /* size of triangular dithering on output */
     case DITHER:

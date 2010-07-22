@@ -103,6 +103,12 @@ int shapeCmd(Sound *s, Tcl_Interp *interp, int objc,
                               "option", 0, &index) != TCL_OK) {
         return TCL_ERROR;
       }
+      if (arg + 1 == objc) {
+	Tcl_AppendResult(interp, "No argument given for ",
+		         subOptionStrings[index], " option", (char *) NULL);
+        return TCL_ERROR;
+      }
+    
       switch ((enum subOptions) index) {
       case START:
         {
@@ -155,6 +161,12 @@ int shapeCmd(Sound *s, Tcl_Interp *interp, int objc,
                               "option", 0, &index) != TCL_OK) {
         return TCL_ERROR;
       }
+      if (arg + 1 == objc) {
+	Tcl_AppendResult(interp, "No argument given for ",
+		         subOptionStrings[index], " option", (char *) NULL);
+        return TCL_ERROR;
+      }
+    
       switch ((enum subOptions) index) {
       case START:
         {
@@ -384,6 +396,12 @@ int dataSamplesCmd(Sound *s, Tcl_Interp *interp, int objc,
                             "option", 0, &index) != TCL_OK) {
       return TCL_ERROR;
     }
+    if (arg + 1 == objc) {
+      Tcl_AppendResult(interp, "No argument given for ",
+		       subOptionStrings[index], " option", (char *) NULL);
+      return TCL_ERROR;
+    }
+    
     switch ((enum subOptions) index) {
     case START:
       {
