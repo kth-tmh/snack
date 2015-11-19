@@ -92,7 +92,7 @@ static int ParseColorMap(ClientData clientData, Tcl_Interp *interp,
 			 Tk_Window tkwin, CONST84 char *value, char *recordPtr,
 			 int offset);
 
-static char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
+static CONST86 char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
 			   char *recordPtr, int offset,
 			   Tcl_FreeProc **freeProcPtr);
 
@@ -399,7 +399,7 @@ SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
   
   if (argc == 1) {
-      if (Tcl_SplitList(interp, argv[0], &argc, &argv) != TCL_OK) {
+      if (Tcl_SplitList(interp, argv[0], &argc, (CONST84 char ***) &argv) != TCL_OK) {
 	  return TCL_ERROR;
       }
   }
@@ -1821,7 +1821,7 @@ ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
   return TCL_OK;
 }
 
-static char*
+static CONST86 char*
 PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
 	      int offset, Tcl_FreeProc **freeProcPtr)
 {

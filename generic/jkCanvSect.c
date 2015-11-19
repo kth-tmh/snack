@@ -360,7 +360,7 @@ SectionCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
   
   if (argc == 1) {
-      if (Tcl_SplitList(interp, argv[0], &argc, &argv) != TCL_OK) {
+      if (Tcl_SplitList(interp, argv[0], &argc, (CONST84 char ***) &argv) != TCL_OK) {
 	  return TCL_ERROR;
       }
   }

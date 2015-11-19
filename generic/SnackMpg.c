@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include "mpg123.h"
+#include <string.h>
+#include <ctype.h>
 
 #if defined(__WIN32__)
 #  include <io.h>
@@ -129,7 +131,7 @@ GuessMpg123File(char *buf, int len)
 {
     long rate;
     int channels, enc;
-    int fnd = 0, ret, done;
+    int fnd = 0, ret; size_t done;
     mpg123_handle *m;
     unsigned char *ubuf = buf;
     unsigned char pcmout[4*sizeof(short)*20000];
@@ -195,7 +197,7 @@ Mpg123Setup(Sound *s, Tcl_Interp *interp, Tcl_Channel ch)
     Mpg123_File *of;
     int ret, fd, rc;
     long mlen;
-    Tcl_ChannelType *cType;
+    const Tcl_ChannelType *cType;
 
     of = MpgObj(s);
     of->isFile = 0;
@@ -334,7 +336,7 @@ CloseMpg123File(Sound *s, Tcl_Interp *interp, Tcl_Channel *ch)
                 mpg123_seek(of->m, of->savepos[of->ref], SEEK_SET);
             }
         }
-        return;
+        return TCL_OK;
     }
 
     FreeRes(of);
