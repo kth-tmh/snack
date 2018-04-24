@@ -395,11 +395,11 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
             Snack_SetNumChannels(s, of->channels);
         }
         if (rc == MPG123_DONE) {
-            if (s->debug) fprintf(stderr, "MPG DONE: %d\n", nread);
+            if (s->debug) fprintf(stderr, "MPG DONE: %zu\n", nread);
             return nread;
         }
         if (rc == MPG123_ERR) {
-            if (s->debug) fprintf(stderr, "MPG ERROR: %d\n", nread);
+            if (s->debug) fprintf(stderr, "MPG ERROR: %zu\n", nread);
             return 0;
         }
         r = (short *) of->pcmbuf;
@@ -410,7 +410,7 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
             r++;
         }
         nread += cnt;
-        if (s->debug) fprintf(stderr, "MPG READ (%d of %d): %d\n", nread, len, rc);
+        if (s->debug) fprintf(stderr, "MPG READ (%zu of %d): %d\n", nread, len, rc);
         if (cnt >= len) break;
         len -= cnt;
     }
@@ -434,7 +434,7 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
     iread = (int)nread;
     if (iread < 0)
     iread = 1;
-    if (s->debug) fprintf(stderr, "MPG READ RET: %d\n", nread);
+    if (s->debug) fprintf(stderr, "MPG READ RET: %zu\n", nread);
     return iread;
 }
 
@@ -460,7 +460,7 @@ SeekMpg123File(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, int pos)
     }
     opos = mpg123_tell(of->m);
     if (pos == opos) {
-        if (s->debug) fprintf(stderr, "MPG SEEK NOMOVE: %d\n", opos, pos);
+        if (s->debug) fprintf(stderr, "MPG SEEK NOMOVE: %d->%d\n", opos, pos);
     }
     opos = pos;
 
