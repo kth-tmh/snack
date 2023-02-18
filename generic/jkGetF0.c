@@ -305,8 +305,10 @@ check_f0_params(Tcl_Interp *interp, F0_params *par, double sample_freq)
   return(error);
 }
 
-static void get_cand(), peak(), do_ffir();
+static void get_cand(), peak();
 static int lc_lin_fir(), downsamp();
+extern void do_ffir();
+extern float *downsample();
 
 /* ----------------------------------------------------------------------- */
 void get_fast_cands(fdata, fdsdata, ind, step, size, dec, start, nlags, engref, maxloc, maxval, cp, peaks, locs, ncand, par)
@@ -503,7 +505,7 @@ static int downsamp(in, out, samples, outsamps, state_idx, decimate, ncoef, fc, 
 }
 
 /*      ----------------------------------------------------------      */
-static void do_ffir(buf,in_samps,bufo,out_samps,idx, ncoef,fc,invert,skip,init)
+void do_ffir(buf, in_samps, bufo, out_samps, idx, ncoef, fc, invert, skip, init)
 /* fc contains 1/2 the coefficients of a symmetric FIR filter with unity
     passband gain.  This filter is convolved with the signal in buf.
     The output is placed in buf2.  If(invert), the filter magnitude
@@ -524,10 +526,11 @@ int idx;
   register float *buf1;
 
   buf1 = buf;
-  if(ncoef > fsize) {/*allocate memory for full coeff. array and filter memory */    fsize = 0;
+  if(ncoef > fsize) {	/* allocate memory for full coeff. array and filter memory */
     i = (ncoef+1)*2;
     if(!((co = (float *)ckrealloc((void *)co, sizeof(float)*i)) &&
 	 (mem = (float *)ckrealloc((void *)mem, sizeof(float)*i)))) {
+      fsize = 0;
       fprintf(stderr,"allocation problems in do_fir()\n");
       return;
     }
@@ -553,63 +556,63 @@ int idx;
       *dp1 = integral - *dp3;
     }
 
-    for(i=ncoef-1, dp1=mem; i-- > 0; ) *dp1++ = 0;
+    /* initialize 1st half with zeros */
+    for(i=ncoef-1, dp1=mem; i-- > 0; ) *dp1++ = 0.0;
   }
-  else
+  else {
+    /* initialize 1st half with last data from previous run */
     for(i=ncoef-1, dp1=mem, sp=state; i-- > 0; ) *dp1++ = *sp++;
-
-  i = in_samps;
-  resid = 0;
+  }
 
   k = (ncoef << 1) -1;	/* inner-product loop limit */
 
-  if(skip <= 1) {       /* never used */
-/*    *out_samps = i;	
-    for( ; i-- > 0; ) {	
+  if(skip <= 1) {
+    for(i = *out_samps; i-- > 0; ) {	
       for(j=k, dp1=mem, dp2=co, dp3=mem+1, sum = 0.0; j-- > 0;
 	  *dp1++ = *dp3++ )
 	sum += *dp2++ * *dp1;
 
-      *--dp1 = *buf++;	
-      *bufo++ = (sum < 0.0)? sum -0.5 : sum +0.5; 
+      *--dp1 = *buf++;		/* new data to memory */
+      *bufo++ = (sum < 0.0)? sum -0.5f : sum +0.5f;
     }
-    if(init & 2) {	
+    if(init & 2) {
       for(i=ncoef; i-- > 0; ) {
 	for(j=k, dp1=mem, dp2=co, dp3=mem+1, sum = 0.0; j-- > 0;
 	    *dp1++ = *dp3++ )
 	  sum += *dp2++ * *dp1;
-	*--dp1 = 0.0;
-	*bufo++ = (sum < 0)? sum -0.5 : sum +0.5; 
+	*--dp1 = 0.0;		/* pad end with zeros */
+	*bufo++ = (sum < 0.0)? sum -0.5f : sum +0.5f;
       }
       *out_samps += ncoef;
     }
-    return;
-*/
-  } 
+  }
   else {			/* skip points (e.g. for downsampling) */
     /* the buffer end is padded with (ncoef-1) data points */
     for( l=0 ; l < *out_samps; l++ ) {
-      for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- >0;
+      for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- > 0;
 	  *dp1++ = *dp3++)
 	sum += *dp2++ * *dp1;
-      for(j=skip; j-- >0; *dp1++ = *buf++) /* new data to memory */
+      for(j=skip; j-- > 0; *dp1++ = *buf++) /* new data to memory */
 	sum += *dp2++ * *dp1;
-      *bufo++ = (sum<0.0) ? sum -0.5f : sum +0.5f;
+      *bufo++ = (sum < 0.0) ? sum -0.5f : sum +0.5f;
     }
     if(init & 2){
       resid = in_samps - *out_samps * skip;
       for(l=resid/skip; l-- >0; ){
-	for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- >0;
+	for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- > 0;
 	    *dp1++ = *dp3++)
 	    sum += *dp2++ * *dp1;
-	for(j=skip; j-- >0; *dp1++ = 0.0)
+	for(j=skip; j-- > 0; *dp1++ = 0.0)  /* pad end with zeros */
 	  sum += *dp2++ * *dp1;
-	*bufo++ = (sum<0.0) ? sum -0.5f : sum +0.5f;
+	*bufo++ = (sum < 0.0) ? sum -0.5f : sum +0.5f;
 	(*out_samps)++;
       }
     }
-    else
-      for(dp3=buf1+idx-ncoef+1, l=ncoef-1, sp=state; l-- >0; ) *sp++ = *dp3++;
+  }
+
+  if(!(init & 2)) {	/* unless this is already the end of the signal */
+    /* keep last (ncoef-1) data points for the next initialization */
+    for(dp3=buf1+idx-ncoef+1, l=ncoef-1, sp=state; l-- > 0; ) *sp++ = *dp3++;
   }
 }
 
@@ -936,7 +939,7 @@ dp_f0(fdata, buff_size, sdstep, freq,
     float	**f0p_pt, **vuvp_pt, **rms_speech_pt, **acpkp_pt;
     int		*vecsize, last_time;
 {
-  float  maxval, engref, *sta, *rms_ratio, *dsdata, *downsample();
+  float  maxval, engref, *sta, *rms_ratio, *dsdata;
   register float ttemp, ftemp, ft1, ferr, err, errmin;
   register int  i, j, k, loc1, loc2;
   int   nframes, maxloc, ncand, ncandp, minloc,

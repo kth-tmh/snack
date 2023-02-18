@@ -611,13 +611,11 @@ double	a;
 int	*l, *k, qlim;
 {
     double aa, af, q, em, qq = 0, pp = 0, ps, e;
-    int	ai, ip, i;
+    int	ai, ip, result = FALSE;
     
     aa = fabs(a);
     ai = (int) aa;
-/*    af = fmod(aa,1.0); */
-    i = (int) aa;
-    af = aa - i;
+    af = aa - ai;
     q = 0;
     em = 1.0;
     while(++q <= qlim) {
@@ -628,15 +626,18 @@ int	*l, *k, qlim;
 	    em = e;
 	    pp = ip;
 	    qq = q;
+	    result = TRUE;
 	}
     };
     *k = (int) ((ai * qq) + pp);
     *k = (a > 0)? *k : -(*k);
     *l = (int) qq;
-    return(TRUE);    
+    return(result);
 }
 
 /* ----------------------------------------------------------------------- */
+
+extern float *downsample();
 
 Sound *Fdownsample(s,freq2,start,end)
      double freq2;
@@ -644,81 +645,102 @@ Sound *Fdownsample(s,freq2,start,end)
      int start;
      int end;
 {
-  short	*bufin, **bufout;
-  static double	beta = 0.0, b[256];
-  double	ratio_t, maxi, ratio, beta_new, freq1;
-  static int	ncoeff = 127, ncoefft = 0, nbits = 15;
-  static short	ic[256];
-  int	insert, decimate, out_samps, smin, smax;
+  float	*bufin, *bufout, *bufp;
+  int	frame_size = 1024, act_size, first_time, last_time;
+  double	ratio, freq1;
+  int	ncoeff, insert, decimate, total_samps, out_samps, ndone;
   Sound *so;
 
   register int i, j;
 
   freq1 = s->samprate;
-  
-  if((bufout = (short**)ckalloc(sizeof(short*)))) {
-    bufin = (short *) ckalloc(sizeof(short) * (end - start + 1));
-    for (i = start; i <= end; i++) {
-      bufin[i-start] = (short) Snack_GetSample(s, 0, i);
+  ratio = freq2/freq1;
+
+  if (!ratprx(ratio, &insert, &decimate, 10))
+    return(NULL);
+
+  if (decimate <= insert)
+    return(NULL);
+
+  freq1 *= (double)insert;
+  freq2 = freq1/((double)decimate);
+
+  /* filter length used in downsample(): 5ms */
+  ncoeff = ((int)(freq1 * 0.005))/2 + 1;
+
+  total_samps = (end - start + 1) * insert;
+  if (total_samps < (ncoeff * decimate * 3))	/* signal too short */
+    return(NULL);
+
+  if ((bufin = (float *) ckalloc(sizeof(float) * total_samps))) {
+    for (bufp = bufin, i = start; i <= end; i++) {
+      *bufp++ = Snack_GetSample(s, 0, i) * ((float)insert);
+      for(j = 1; j < insert; j++)
+        *bufp++ = 0.0f;	/* insert zeros to boost the sampling frequency */
     }
 
-    ratio = freq2/freq1;
-    ratprx(ratio,&insert,&decimate,10);
-    ratio_t = ((double)insert)/((double)decimate);
+    if ((frame_size * 2) > total_samps)
+      frame_size = (total_samps + 1)/2;
 
-    if(ratio_t > .99) return(s);
-  
-    freq2 = ratio_t * freq1;
-    beta_new = (.5 * freq2)/(insert * freq1);
+    frame_size -= frame_size % decimate;
 
-    if(beta != beta_new){
-      beta = beta_new;
-      if( !lc_lin_fir(beta,&ncoeff,b)) {
-	printf("\nProblems computing interpolation filter\n");
-	return(FALSE);
-      }
-      maxi = (1 << nbits) - 1;
-      j = (ncoeff/2) + 1;
-      for(ncoefft = 0, i=0; i < j; i++){
-	ic[i] = (int) (0.5 + (maxi * b[i]));
-	if(ic[i]) ncoefft = i+1;
-      }
-    }				/*  endif new coefficients need to be computed */
+    first_time = 1;	/* new filter coefficients need to be computed */
 
-    if(dwnsamp(bufin,end-start+1,bufout,&out_samps,insert,decimate,ncoefft,ic,
-	       &smin,&smax)){
-      /*      so->buff_size = so->file_size = out_samps;*/
-      so = Snack_NewSound(0, LIN16, s->nchannels);
-      Snack_ResizeSoundStorage(so, out_samps);
-      for (i = 0; i < out_samps; i++) {
-	Snack_SetSample(so, 0, i, (float)(*bufout)[i]);
+    for (ndone = 0, last_time = 0; !last_time; ndone += act_size) {
+      act_size = total_samps - ncoeff - ndone;
+      if (act_size > frame_size) {
+        act_size = frame_size;
+        out_samps = act_size/decimate;
+      } else {
+        out_samps = act_size/decimate;
+        if (!first_time && ((act_size + ncoeff) <= frame_size)) {
+          act_size += ncoeff;
+          last_time = 1;
+        } else
+          act_size = out_samps * decimate;
       }
-      so->length = out_samps;
-      so->samprate = (int)freq2;
-      ckfree((void *)*bufout);
-      ckfree((void *)bufout);
-      ckfree((void *)bufin);
-      return(so);
-    } else
-      printf("Problems in dwnsamp() in downsample()\n");
+
+      if ((bufout = downsample(bufin+ndone, total_samps-ndone, act_size, freq1,
+                               &out_samps, decimate, first_time, last_time))) {
+        if (first_time) {
+          first_time = 0;
+          so = Snack_NewSound((int)freq2, LIN16, s->nchannels);
+          if (!so) {
+            printf("Can't create a new Signal in downsample()\n");
+            break;
+          }
+          Snack_ResizeSoundStorage(so, total_samps/decimate);
+          so->length = 0;
+        }
+
+        Snack_PutSoundData(so, so->length, bufout, out_samps);
+        so->length += out_samps;
+      } else {
+        printf("Problems in downsample()\n");
+        break;
+      }
+    }
+    ckfree((void *)bufin);
   } else
        printf("Can't create a new Signal in downsample()\n");
   
-  return(NULL);
+  return(so);
 }
 
 /*      ----------------------------------------------------------      */
 
-Sound 
-*highpass(s)
+extern void do_ffir();
+
+Sound *highpass(s)
      Sound *s;
 {
 
-  short *datain, *dataout;
-  static short *lcf;
+  float *datain, *dataout;
+  static float *lcf;
   static int len = 0;
   double scale, fn;
   register int i;
+  int	frame_size = 1024, act_size, total_samps, out_samps, ndone, init;
   Sound *so;
 
   /*  Header *h, *dup_header();*/
@@ -727,28 +749,62 @@ Sound
   /* This assumes the sampling frequency is 10kHz and that the FIR
      is a Hanning function of (LCSIZ/10)ms duration. */
 
-  datain = (short *) ckalloc(sizeof(short) * s->length);
-  dataout = (short *) ckalloc(sizeof(short) * s->length);
-  for (i = 0; i < Snack_GetLength(s); i++) {
-    datain[i] = (short) Snack_GetSample(s, 0, i);
+  if(!len) {		/* need to create a Hanning FIR? */
+    lcf = (float *) ckalloc(sizeof(float) * LCSIZ);
+    len = 1 + (LCSIZ/2);
+    fn = M_PI * 2.0 / (LCSIZ - 1);
+    scale = 1.0/(.5 * LCSIZ);
+    for (i=0; i < len; i++)
+      lcf[i] = (float) (scale * (.5 + (.4 * cos(fn * ((double)i)))));
   }
 
-  if(!len) {		/* need to create a Hanning FIR? */
-    lcf = (short*)ckalloc(sizeof(short) * LCSIZ);
-    len = 1 + (LCSIZ/2);
-    fn = PI * 2.0 / (LCSIZ - 1);
-    scale = 32767.0/(.5 * LCSIZ);
-    for(i=0; i < len; i++) 
-      lcf[i] = (short) (scale * (.5 + (.4 * cos(fn * ((double)i)))));
+  total_samps = s->length;
+  if (total_samps < (len * 3))
+    total_samps = len * 3;
+
+  datain = (float *) ckalloc(sizeof(float) * total_samps);
+  dataout = (float *) ckalloc(sizeof(float) * total_samps);
+  if (!datain || !dataout) {
+    printf("Can't create a new Signal in highpass()\n");
+    return(NULL);
   }
-  do_fir(datain,s->length,dataout,len,lcf,1); /* in downsample.c */
+
+  Snack_GetSoundData(s, 0, datain, s->length);
+
+  for (i = s->length; i < total_samps; i++)
+    datain[i] = 0.0;
+
+  if (frame_size > total_samps)
+    frame_size = total_samps;
+
+  for (ndone = 0, init = 1; !(init & 2); ndone += act_size) {
+    act_size = total_samps - len - ndone;
+    if (act_size > frame_size) {
+      out_samps = act_size = frame_size;
+    } else {
+      out_samps = act_size;
+      if (!(init & 1) && ((act_size + len) <= frame_size)) {
+        act_size += len;
+        init = 2;
+      }
+    }
+
+    do_ffir(datain+ndone, total_samps-ndone, dataout+ndone,
+            &out_samps, act_size, len, lcf, 1, 1, init);
+
+    if (init & 1)
+      init = 0;
+  }
+
   so = Snack_NewSound(s->samprate, LIN16, s->nchannels);
-  if (so == NULL) return(NULL);
-  Snack_ResizeSoundStorage(so, s->length);
-  for (i = 0; i < s->length; i++) {
-    Snack_SetSample(so, 0, i, (float)dataout[i]);
+  if (!so) {
+    printf("Can't create a new Signal in highpass()\n");
+  } else {
+    Snack_ResizeSoundStorage(so, s->length);
+    Snack_PutSoundData(so, 0, dataout, s->length);
+    so->length = s->length;
   }
-  so->length = s->length;
+
   ckfree((void *)dataout);
   ckfree((void *)datain);
   return(so);
