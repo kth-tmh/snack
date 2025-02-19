@@ -64,17 +64,16 @@ static int	maxp,	/* number of poles to consider */
 
 static short **pc;
 
-static int canbe(pnumb, fnumb) /* can this pole be this freq.? */
-int	pnumb, fnumb;
+static int canbe(int pnumb, int fnumb) /* can this pole be this freq.? */
 {
 return((fre[pnumb] >= fmins[fnumb])&&(fre[pnumb] <= fmaxs[fnumb]));
 }
 
 /* This does the real work of mapping frequencies to formants. */
-static void candy(cand,pnumb,fnumb)
-     int	cand, /* candidate number being considered */
-       pnumb, /* pole number under consideration */
-       fnumb;	/* formant number under consideration */
+static void candy(int cand, int pnumb, int fnumb)
+     /* cand:  candidate number being considered */
+     /* pnumb: pole number under consideration */
+     /* fnumb: formant number under consideration */
 {
   int i,j;
 
@@ -117,10 +116,8 @@ static void candy(cand,pnumb,fnumb)
 /* Given a set of pole frequencies and allowable formant frequencies
    for nform formants, calculate all possible mappings of pole frequencies
    to formants, including, possibly, mappings with missing formants. */
-void get_fcand(npole,freq,band,nform,pcan)
-     int	npole, nform;
-     short **pcan;
-     double	*freq, *band; /* poles ordered by increasing FREQUENCY */
+void get_fcand(int npole, double *freq, double *band, int nform, short **pcan)
+     /* poles ordered by increasing FREQUENCY */
 {	
 
   ncan = 0;
@@ -132,8 +129,7 @@ void get_fcand(npole,freq,band,nform,pcan)
   ncan++;	/* (converts ncan as an index to ncan as a candidate count) */
 }
 
-void set_nominal_freqs(f1)
-     double f1;
+void set_nominal_freqs(double f1)
 {
   int i;
   for(i=0; i < MAXFORMANTS; i++) {
@@ -145,9 +141,7 @@ void set_nominal_freqs(f1)
 
 /*      ----------------------------------------------------------      */
 /* find the maximum in the "stationarity" function (stored in rms) */
-double get_stat_max(pole, nframes)
-     register POLE **pole;
-     register int nframes;
+double get_stat_max(register POLE **pole, register int nframes)
 {
   register int i;
   register double amax, t;
@@ -158,10 +152,7 @@ double get_stat_max(pole, nframes)
   return(amax);
 }
 
-Sound *dpform(ps, nform, nom_f1)
-     Sound *ps;
-     int nform;
-     double nom_f1;
+Sound *dpform(Sound *ps, int nform, double nom_f1)
 {
   double pferr, conerr, minerr, dffact, ftemp, berr, ferr, bfact, ffact,
          rmsmax, fbias, **fr, **ba, rmsdffact, merger=0.0, merge_cost,
@@ -436,11 +427,15 @@ Sound *dpform(ps, nform, nom_f1)
 
 #define MAXORDER 30
 
-extern int formant(), lpc(), lpcbsa(), dlpcwtd(), w_covar();
+extern int dlpcwtd(double *s, int *ls, double *p, int *np, double *c, double *phi, double *shi, double *xl, double *w);
+extern int formant(int lpc_order, double s_freq, double *lpca, int *n_form, double *freq, double *band, int init);
+extern int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data, double *lpca,
+        double *ar, double *lpck, double *normerr, double *rms, double preemp, int type);
+extern int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp);
+extern int w_covar(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp, int w_type);
 
 /*************************************************************************/
-double integerize(time, freq)
-     register double time, freq;
+double integerize(register double time, register double freq)
 {
   register int i;
 
@@ -449,17 +444,13 @@ double integerize(time, freq)
 }
 
 /*	Round the argument to the nearest integer.			*/
-int eround(flnum)
-register double	flnum;
+int eround(register double	flnum)
 {
 	return((flnum >= 0.0) ? (int)(flnum + 0.5) : (int)(flnum - 0.5));
 }
 
 /*************************************************************************/
-Sound *lpc_poles(sp,wdur,frame_int,lpc_ord,preemp,lpc_type,w_type)
-     Sound *sp;
-     int lpc_ord, lpc_type, w_type;
-     double wdur, frame_int, preemp;
+Sound *lpc_poles(Sound *sp, double wdur, double frame_int, int lpc_ord, double preemp, int lpc_type, int w_type)
 {
   int i, j, size, step, nform, init, nfrm;
   POLE **pole;
@@ -566,10 +557,7 @@ double frand()
 /* a quick and dirty interface to bsa's stabilized covariance LPC */
 #define NPM	30	/* max lpc order		*/
 
-int lpcbsa(np, lpc_stabl, wind, data, lpc, rho, nul1, nul2, energy, preemp)
-     int np, wind;
-     short *data;
-     double *lpc, *rho, *nul1, *nul2, *energy, lpc_stabl, preemp;
+int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp)
 {
   static int i, mm, owind=0, wind1;
   static double w[1000];
@@ -606,9 +594,7 @@ int lpcbsa(np, lpc_stabl, wind, data, lpc, rho, nul1, nul2, energy, preemp)
 
 /*      ----------------------------------------------------------      */
 
-int ratprx(a,k,l,qlim)
-double	a;    
-int	*l, *k, qlim;
+int ratprx(double a, int *k, int *l, int qlim)
 {
     double aa, af, q, em, qq = 0, pp = 0, ps, e;
     int	ai, ip, result = FALSE;
@@ -637,13 +623,9 @@ int	*l, *k, qlim;
 
 /* ----------------------------------------------------------------------- */
 
-extern float *downsample();
+extern float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time);
 
-Sound *Fdownsample(s,freq2,start,end)
-     double freq2;
-     Sound *s;
-     int start;
-     int end;
+Sound *Fdownsample(Sound *s, double freq2, int start, int end)
 {
   float	*bufin, *bufout, *bufp;
   int	frame_size = 1024, act_size, first_time, last_time;
@@ -729,10 +711,9 @@ Sound *Fdownsample(s,freq2,start,end)
 
 /*      ----------------------------------------------------------      */
 
-extern void do_ffir();
+extern void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init);
 
-Sound *highpass(s)
-     Sound *s;
+Sound *highpass(Sound *s)
 {
 
   float *datain, *dataout;

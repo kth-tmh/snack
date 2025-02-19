@@ -62,7 +62,7 @@ int
 CheckFFTlen(Tcl_Interp *interp, int fftlen)
 {
   int n = NMIN;
-  char str[10];
+  char str[16];
 
   while (n <= NMAX) {
     if (n == fftlen) return TCL_OK;
@@ -82,7 +82,7 @@ CheckFFTlen(Tcl_Interp *interp, int fftlen)
 int
 CheckWinlen(Tcl_Interp *interp, int winlen, int fftlen)
 {
-  char str[10];
+  char str[16];
 
   if (winlen < 1) {
     Tcl_AppendResult(interp, "-winlength must be > 0", NULL);

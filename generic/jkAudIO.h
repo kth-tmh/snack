@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 #ifndef CONST84
-#   define CONST84
+#   define CONST84 const
 #endif
 
 #ifdef HPUX

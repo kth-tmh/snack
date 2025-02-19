@@ -27,7 +27,7 @@
 #endif
 
 #ifndef CONST84
-#   define CONST84
+#   define CONST84 const
 #endif
 
 #include "jkSound.h"

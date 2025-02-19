@@ -13,8 +13,7 @@
 
 
 static double *pxl,*pa,*py,*pyl,*pa1,*px;
-void dlwrtrn(a,n,x,y)
-double *a,*x,*y; int *n;
+void dlwrtrn(double *a, int *n, double *x, double *y)
 /*	routine to solve ax=y with cholesky 
 	a - nxn matrix
 	x,y -vectors
@@ -36,7 +35,7 @@ double *a,*x,*y; int *n;
 }
 
 static double *pa1,*pa2,*pa3,*pa4,*pa5,*pc;
-void dreflpc(c,a,n) double *c,*a; int *n;{
+void dreflpc(double *c, double *a, int *n) {
 double ta1;
 /*	convert ref to lpc
 	c - ref
@@ -62,9 +61,7 @@ for(pa1=a+2;pa1<=pa2;pa1++)
 }
 
 double *pa_1,*pa_2,*pa_3,*pa_4,*pa_5,*pal,*pt;
-int dchlsky(a,n,t,det)
-double *a,*t,*det;
-int *n;
+int dchlsky(double *a, int *n, double *t, double *det)
 /*	performs cholesky decomposition
 	a - l * l(transpose)
 	l - lower triangle
@@ -76,7 +73,6 @@ int *n;
 					*/
 {
 	double sm;
-	double sqrt();
 	int m;
 	*det = 1.;
 	m = 0;
@@ -107,9 +103,7 @@ int *n;
 
 
 static double *pp,*ppl,*pa;
-int dcovlpc(p,s,a,n,c)
-double *p,*s,*a,*c;
-int *n;
+int dcovlpc(double *p, double *s, double *a, int *n, double *c)
 /*	solve p*a=s using stabilized covariance method
 	p - cov nxn matrix
 	s - corrvec
@@ -118,7 +112,7 @@ int *n;
 				*/
 {
 	double ee;
-	double sqrt(),ps,ps1,thres,d;
+	double ps,ps1,thres,d;
 	int m,n1;
 	m = dchlsky(p,n,c,&d);
 	dlwrtrn(p,n,c,s);
@@ -153,8 +147,7 @@ int *n;
 
 /* cov mat for wtd lpc	*/
 static double *pdl1,*pdl2,*pdl3,*pdl4,*pdl5,*pdl6,*pdll;
-void dcwmtrx(s,ni,nl,np,phi,shi,ps,w)
-double *s,*phi,*shi,*ps,*w; int *ni,*nl,*np;
+void dcwmtrx(double *s, int *ni, int *nl, int *np, double *phi, double *shi, double *ps, double *w)
 {
 	double sm;
 	int i,j;
@@ -183,9 +176,7 @@ double *s,*phi,*shi,*ps,*w; int *ni,*nl,*np;
 }
 
 double *psl,*pp2,*ppl2,*pc2,*pcl,*pph1,*pph2,*pph3,*pphl;
-int dlpcwtd(s,ls,p,np,c,phi,shi,xl,w)
-double *s,*p,*c,*phi,*shi,*xl,*w;
-int *ls,*np;
+int dlpcwtd(double *s, int *ls, double *p, int *np, double *c, double *phi, double *shi, double *xl, double *w)
 /*	pred anal subroutine with ridge reg
 	s - speech
 	ls - length of s
@@ -284,7 +275,7 @@ return(m);
 #endif
 
 
-void lgsol(p, r, k, ex)
+void lgsol(register int p, register double *r, register double *k, register double *ex)
 /*  p	=	The order of the LPC analysis.
  *  r	=	The array of p+1 autocorrelation coefficients.
  *  k	=	The array of PARCOR coefficients returned by lgsol.
@@ -293,10 +284,6 @@ void lgsol(p, r, k, ex)
  * All coefficients are returned in "normal" signed format,
  *	i.e. a[0] is assumed to be = 1.
  */
-
-register int p;
-register double *r, *k, *ex;
-
 {
 register int m, h;
 double rl[MAXORDER+1], ep[MAXORDER], en[MAXORDER];
@@ -345,10 +332,7 @@ register double *q, *s, temp;
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void rwindow(din, dout, n, preemp)
-     register short *din;
-     register double *dout, preemp;
-     register int n;
+void rwindow(register short *din, register double *dout, register int n, register double preemp)
 {
   register short *p;
  
@@ -365,10 +349,7 @@ void rwindow(din, dout, n, preemp)
 
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void cwindow(din, dout, n, preemp)
-     register short *din;
-     register double *dout, preemp;
-     register int n;
+void cwindow(register short *din, register double *dout, register int n, register double preemp)
 {
   register int i;
   register short *p;
@@ -400,10 +381,7 @@ void cwindow(din, dout, n, preemp)
 
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void hwindow(din, dout, n, preemp)
-     register short *din;
-     register double *dout, preemp;
-     register int n;
+void hwindow(register short *din, register double *dout, register int n, register double preemp)
 {
   register int i;
   register short *p;
@@ -433,10 +411,7 @@ void hwindow(din, dout, n, preemp)
 
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void hnwindow(din, dout, n, preemp)
-     register short *din;
-     register double *dout, preemp;
-     register int n;
+void hnwindow(register short *din, register double *dout, register int n, register double preemp)
 {
   register int i;
   register short *p;
@@ -465,10 +440,7 @@ void hnwindow(din, dout, n, preemp)
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-int get_window(dout, n, type)
-     register double *dout;
-     register int n;
-     register int type;
+int get_window(register double *dout, register int n, register int type)
 {
   static short *din = NULL;
   static int n0 = 0;
@@ -507,10 +479,7 @@ int get_window(dout, n, type)
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-int get_float_window(fout, n, type)
-     register float *fout;
-     register int n;
-     register int type;
+int get_float_window(register float *fout, register int n, register int type)
 {
   static int n0 = 0;
   static double *dout = NULL;
@@ -535,11 +504,7 @@ int get_float_window(fout, n, type)
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-int fwindow(din, dout, n, preemp, type)
-     register short *din;
-     register float *dout, preemp;
-     register int n;
-     register int type;
+int fwindow(register short *din, register float *dout, register int n, register float preemp, register int type)
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -575,11 +540,7 @@ int fwindow(din, dout, n, preemp, type)
   
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* same as fwindow() but input is float */
-int fwindow_f(din, dout, n, preemp, type)
-     register float *din;
-     register float *dout, preemp;
-     register int n;
-     register int type;
+int fwindow_f(register float *din, register float *dout, register int n, register float preemp, register int type)
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -615,11 +576,7 @@ int fwindow_f(din, dout, n, preemp, type)
   
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* same as fwindow() but I/O is double */
-int fwindow_d(din, dout, n, preemp, type)
-     register double *din;
-     register double *dout, preemp;
-     register int n;
-     register int type;
+int fwindow_d(register double *din, register double *dout, register int n, register double preemp, register int type)
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -656,11 +613,7 @@ int fwindow_d(din, dout, n, preemp, type)
 
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void w_window(din, dout, n, preemp, type)
-     register short *din;
-     register double *dout, preemp;
-     register int n;
-     register int type;
+void w_window(register short *din, register double *dout, register int n, register double preemp, register int type)
 {
   switch(type) {
   case 0:
@@ -681,9 +634,7 @@ void w_window(din, dout, n, preemp, type)
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-void autoc( windowsize, s, p, r, e )
-register int windowsize, p;
-register double *s, *r, *e;
+void autoc(register int windowsize, register double *s, register int p, register double *r, register double *e)
 /*
  * Compute the pp+1 autocorrelation lags of the windowsize samples in s.
  * Return the normalized autocorrelation coefficients in r.
@@ -716,9 +667,7 @@ register double *s, *r, *e;
 }
 
 
-void k_to_a ( k, a, p )
-register int p;
-register double *k, *a;
+void k_to_a(register double *k, register double *a, register int p)
 /*
  * Convert the p PARCOR parameters in k to LPC (AR) coefficients in a.
  */
@@ -738,9 +687,7 @@ register double *k, *a;
     }
 }
    
-void durbin ( r, k, a, p, ex)
-register int p;
-register double *r, *k, *a, *ex;
+void durbin(register double *r, register double *k, register double *a, register int p, register double *ex)
 /*
 * Compute the AR and PARCOR coefficients using Durbin's recursion. 
 * Note: Durbin returns the coefficients in normal sign format.
@@ -773,9 +720,7 @@ register double *r, *k, *a, *ex;
     *ex = e;
 }
 
-void a_to_aca ( a, b, c, p )
-double *a, *b, *c;
-register int p;
+void a_to_aca (double *a, double *b, double *c, register int p)
 /*  Compute the autocorrelations of the p LP coefficients in a. 
  *  (a[0] is assumed to be = 1 and not explicitely accessed.)
  *  The magnitude of a is returned in c.
@@ -799,9 +744,7 @@ register int p;
 
 }
 
-double itakura ( p, b, c, r, gain )
-register double *b, *c, *r, *gain;
-register int p;
+double itakura(register int p, register double *b, register double *c, register double *r, register double *gain)
 /* Compute the Itakura LPC distance between the model represented
  * by the signal autocorrelation (r) and its residual (gain) and
  * the model represented by an LPC autocorrelation (c, b).
@@ -818,10 +761,8 @@ register int p;
     return (s/ *gain);
 }
 
-int lpc(lpc_ord,lpc_stabl,wsize,data,lpca,ar,lpck,normerr,rms,preemp,type)
-     int lpc_ord, wsize, type;
-     double lpc_stabl, *lpca, *ar, *lpck, *normerr, *rms, preemp;
-     short *data;
+int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data, double *lpca,
+        double *ar, double *lpck, double *normerr, double *rms, double preemp, int type)
 {
   static double *dwind=NULL;
   static int nwind=0;
@@ -885,7 +826,7 @@ to un-windowed data. */
 }
 
 /* convert reflection (PARCOR) coefficients to areas */
-void dreflar(c,a,n) double *c,*a; int n;{
+void dreflar(double *c, double *a, int n) {
 /*	refl to area			*/
 	register double *pa,*pa1,*pc,*pcl;
 	pa = a + 1;	pa1 = a;
@@ -897,11 +838,7 @@ void dreflar(c,a,n) double *c,*a; int n;{
 /* covariance LPC analysis; originally from Markel and Gray */
 /* (a translation from the fortran) */
 
-int w_covar(xx,m,n,istrt,y,alpha,r0,preemp,w_type)
-     double *y, *alpha, *r0, preemp;
-     short *xx;
-     int *m,n,istrt;
-     int w_type;
+int w_covar(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp, int w_type)
 {
   static double *x=NULL;
   static int nold = 0;
@@ -1023,10 +960,7 @@ int w_covar(xx,m,n,istrt,y,alpha,r0,preemp,w_type)
 }
 
 /* Same as above, but returns alpha as a function of order. */
-int covar2(xx,m,n,istrt,y,alpha,r0,preemp)
-     double *y, *alpha, *r0, preemp;
-     short *xx;
-     int *m,n,istrt;
+int covar2(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp)
 {
   static double *x=NULL;
   static int nold = 0;
@@ -1128,20 +1062,20 @@ int covar2(xx,m,n,istrt,y,alpha,r0,preemp)
  return(TRUE);
 }
 
-int lbpoly(); 
+int lbpoly(double *a, int order, double *rootr, double *rooti);
 	 
 /*      ----------------------------------------------------------      */
 /* Find the roots of the LPC denominator polynomial and convert the z-plane
 	zeros to equivalent resonant frequencies and bandwidths.	*/
 /* The complex poles are then ordered by frequency.  */
-int formant(lpc_order,s_freq,lpca,n_form,freq,band,init)
-int	lpc_order, /* order of the LP model */
-	*n_form,   /* number of COMPLEX roots of the LPC polynomial */
-	init; 	   /* preset to true if no root candidates are available */
-double	s_freq,    /* the sampling frequency of the speech waveform data */
-	*lpca, 	   /* linear predictor coefficients */
-	*freq,     /* returned array of candidate formant frequencies */
-	*band;     /* returned array of candidate formant bandwidths */
+int formant(int lpc_order, double s_freq, double *lpca, int *n_form, double *freq, double *band, int init)
+/* 	lpc_order:  order of the LP model */
+/*	*n_form:    number of COMPLEX roots of the LPC polynomial */
+/*	init: 	    preset to true if no root candidates are available */
+/*	s_freq:     the sampling frequency of the speech waveform data */
+/*	*lpca: 	    linear predictor coefficients */
+/*	*freq:      returned array of candidate formant frequencies */
+/*	*band:      returned array of candidate formant bandwidths */
 {
   double  x, flo, pi2t, theta;
   static double  rr[MAXORDER], ri[MAXORDER];
@@ -1208,10 +1142,8 @@ double	s_freq,    /* the sampling frequency of the speech waveform data */
 
 
 /*-----------------------------------------------------------------------*/
-int log_mag(x,y,z,n)
+int log_mag(double *x, double *y, double *z, int n)
 			/* z <- (10 * log10(x^2 + y^2))  for n elements */
-double	*x, *y, *z;
-int	n;
 {
 register double	*xp, *yp, *zp, t1, t2, ssq;
 
@@ -1229,10 +1161,8 @@ register double	*xp, *yp, *zp, t1, t2, ssq;
 }
 
 /*-----------------------------------------------------------------------*/
-int flog_mag(x,y,z,n)
+int flog_mag(float *x, float *y, float *z, int n)
 			/* z <- (10 * log10(x^2 + y^2))  for n elements */
-float	*x, *y, *z;
-int	n;
 {
 register float	*xp, *yp, *zp, t1, t2, ssq;
 
@@ -1252,9 +1182,7 @@ register float	*xp, *yp, *zp, t1, t2, ssq;
 #ifdef USE_OLD_FFT
 #include	"thetable.c"	/*  table of sines and cosines */
 /*-----------------------------------------------------------------------*/
-fft ( l, x, y )
-int l;
-double *x, *y;
+fft(int l, double *x, double *y)
 /* Compute the discrete Fourier transform of the 2**l complex sequence
  * in x (real) and y (imaginary).  The DFT is computed in place and the
  * Fourier coefficients are returned in x and y.
@@ -1317,9 +1245,7 @@ int	np, lmx, lo, lixnp, lm, j, nv2, k, im, jm;
 }
 
 /*-----------------------------------------------------------------------*/
-ifft ( l, x, y )
-int l;
-double *x, *y;
+ifft(int l, double *x, double *y)
 /* Compute the discrete inverse Fourier transform of the 2**l complex sequence
  * in x (real) and y (imaginary).  The DFT is computed in place and the
  * Fourier coefficients are returned in x and y.
@@ -1383,9 +1309,7 @@ int	np, lmx, lo, lixnp, lm, j, nv2, k, im, jm;
 
 #include	"theftable.c"	/*  floating table of sines and cosines */
 /*-----------------------------------------------------------------------*/
-ffft ( l, x, y )
-int l;
-float *x, *y;
+ffft(int l, float *x, float *y)
 /* Compute the discrete Fourier transform of the 2**l complex sequence
  * in x (real) and y (imaginary).  The DFT is computed in place and the
  * Fourier coefficients are returned in x and y.
@@ -1448,9 +1372,7 @@ int	np, lmx, lo, lixnp, lm, j, nv2, k, im, jm;
 }
 
 /*-----------------------------------------------------------------------*/
-fifft ( l, x, y )
-int l;
-float *x, *y;
+fifft(int l, float *x, float *y)
 /* Compute the discrete inverse Fourier transform of the 2**l complex sequence
  * in x (real) and y (imaginary).  The DFT is computed in place and the
  * Fourier coefficients are returned in x and y.
@@ -1515,9 +1437,7 @@ int	np, lmx, lo, lixnp, lm, j, nv2, k, im, jm;
 
 /*********************************************************************/
 /* Simple-minded real DFT (slooooowww) */
-void dft(n,x,re,im)
-     register int n;
-     double *x, *re, *im;
+void dft(register int n, double *x, double *re, double *im)
 {
   register int m = n/2, i, j;
   register double arg, sr, si, a, *rp;
@@ -1544,11 +1464,10 @@ void dft(n,x,re,im)
 #define MAX_TRYS	100	/* Max number of times to try new starts */
 #define MAX_ERR		1.e-6	/* Max acceptable error in quad factor */
 
-int qquad(a,b,c,r1r,r1i,r2r,r2i) /* find x, where a*x**2 + b*x + c = 0 	*/
-double	a, b, c;
-double *r1r, *r2r, *r1i, *r2i; /* return real and imag. parts of roots */
+int qquad(double a,double b,double c, double *r1r, double *r1i, double *r2r, double *r2i) /* find x, where a*x**2 + b*x + c = 0 	*/
+/* return real and imag. parts of roots */
 {
-double  sqrt(), numi;
+double  numi;
 double  den, y;
 
 	if(a == 0.0){
@@ -1593,10 +1512,10 @@ double  den, y;
 	}
 }
 
-int lbpoly(a, order, rootr, rooti) /* return FALSE on error */
-    double  *a;		    /* coeffs. of the polynomial (increasing order) */
-    int	    order;	    /* the order of the polynomial */
-    double  *rootr, *rooti; /* the real and imag. roots of the polynomial */
+int lbpoly(double *a, int order, double *rootr, double *rooti) /* return FALSE on error */
+    /* *a:	       coeffs. of the polynomial (increasing order) */
+    /* order:	       the order of the polynomial */
+    /* *rootr, *rooti: the real and imag. roots of the polynomial */
     /* Rootr and rooti are assumed to contain starting points for the root
        search on entry to lbpoly(). */
 {
