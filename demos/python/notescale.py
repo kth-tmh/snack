@@ -1,6 +1,6 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-from Tkinter import *
+from tkinter import *
 from tkSnack import *
 
 root = Tkinter.Tk()

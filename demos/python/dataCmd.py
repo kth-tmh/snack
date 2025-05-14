@@ -1,7 +1,7 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 # -*- coding: iso-8859-1 -*-
 
-import Tkinter
+import tkinter as Tkinter
 import tkSnack
 
 root = Tkinter.Tk()
