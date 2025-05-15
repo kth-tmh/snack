@@ -155,7 +155,7 @@ sigproc2.o: $(GENERIC_DIR)/sigproc2.c
 	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/sigproc2.c
 
 snackStubLib.o: $(GENERIC_DIR)/snackStubLib.c
-	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/snackStubLib.c
+	$(CC) -c $(CFLAGS) -UALSA -UOSS $(GENERIC_DIR)/snackStubLib.c
 
 libsound${SHLIB_SUFFIX}: ${OBJSO}
 	${SHLIB_LD} ${OBJSO} ${LIBSO} -o libsound${SHLIB_SUFFIX} 
@@ -303,13 +303,13 @@ LIBMP3 = -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
 OBJMP3 = SnackMP3.o
 
 SnackOgg.o: $(GENERIC_DIR)/SnackOgg.c
-	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS $(GENERIC_DIR)/SnackOgg.c
+	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackOgg.c
 
 libsnackogg${SHLIB_SUFFIX}: ${OBJOGG}
 	${SHLIB_LD} ${OBJOGG} ${LIBOGG} -o libsnackogg${SHLIB_SUFFIX}
 
 SnackMpg.o: $(GENERIC_DIR)/SnackMpg.c
-	$(CC) -c $(CFLAGS) -DUSE_SNACK_STUBS $(GENERIC_DIR)/SnackMpg.c
+	$(CC) -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackMpg.c
 
 libsnackmpg${SHLIB_SUFFIX}: ${OBJMPG}
 	${SHLIB_LD} ${OBJMPG} ${LIBMPG} -o libsnackmpg${SHLIB_SUFFIX}

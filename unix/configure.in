@@ -229,7 +229,7 @@ fi
 #--------------------------------------------------------------------
 
 # Checks for header files.
-_AC_INCLUDES_DEFAULT_REQUIREMENTS
+AC_INCLUDES_DEFAULT
 
 AC_SUBST(CC)
 AC_SUBST(CFLAGS)
@@ -263,4 +263,5 @@ AC_SUBST(DOSTUBLIB)
 AC_SUBST(SNACK_STUB_LIB_FLAG)
 AC_SUBST(SNACK_VERSION)
 
-AC_OUTPUT(Makefile snackConfig.sh)
+AC_CONFIG_FILES([Makefile snackConfig.sh])
+AC_OUTPUT
