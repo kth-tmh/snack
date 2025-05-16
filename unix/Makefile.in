@@ -305,13 +305,13 @@ OBJMP3 = SnackMP3.o
 SnackOgg.o: $(GENERIC_DIR)/SnackOgg.c
 	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackOgg.c
 
-libsnackogg${SHLIB_SUFFIX}: ${OBJOGG}
+libsnackogg${SHLIB_SUFFIX}: ${OBJOGG} @DOSTUBLIB@
 	${SHLIB_LD} ${OBJOGG} ${LIBOGG} -o libsnackogg${SHLIB_SUFFIX}
 
 SnackMpg.o: $(GENERIC_DIR)/SnackMpg.c
 	$(CC) -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackMpg.c
 
-libsnackmpg${SHLIB_SUFFIX}: ${OBJMPG}
+libsnackmpg${SHLIB_SUFFIX}: ${OBJMPG} @DOSTUBLIB@
 	${SHLIB_LD} ${OBJMPG} ${LIBMPG} -o libsnackmpg${SHLIB_SUFFIX}
 
 install:
