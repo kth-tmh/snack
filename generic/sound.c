@@ -65,7 +65,7 @@ int
 Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
 	       Tcl_Obj *CONST objv[])
 {
-  int len;
+  Tcl_Size len;
   char *str;
   CONST84 char *patchLevelStr;
 
@@ -149,7 +149,7 @@ Sound_Init(Tcl_Interp *interp)
   char rates[100];
   
 #ifdef USE_TCL_STUBS
-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }
 #endif

@@ -20,8 +20,7 @@
  */
 
 #include "tcl.h"
-#include "jkAudIO.h"
-#include "jkSound.h"
+#include "snack.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>

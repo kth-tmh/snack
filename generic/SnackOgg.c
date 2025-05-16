@@ -2220,7 +2220,8 @@ static int
 PutOggHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 	     int objc, Tcl_Obj *CONST objv[], int len)
 {
-  int arg, n = 0, ret;
+  int arg, ret;
+  Tcl_Size n = 0;
   OggVorbis_File *of = (OggVorbis_File *)s->extHead2;
   Tcl_Obj **listObj;
   static char *subOptionStrings[] = {
@@ -2535,7 +2536,7 @@ ConfigOgg(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       switch ((enum options) index) {
       case COMMENT:
 	{
-	  int i, n;
+	  Tcl_Size i, n;
 	  Tcl_Obj **listObj;
 	  
 	  if (Tcl_ListObjGetElements(interp, objv[arg+1], &n, &listObj) !=
@@ -2606,7 +2607,7 @@ EXPORT(int, Snackogg_Init) _ANSI_ARGS_((Tcl_Interp *interp))
   int res;
   
 #ifdef USE_TCL_STUBS
-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }
 #endif

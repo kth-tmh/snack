@@ -98,7 +98,7 @@ static int
 iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
 	       Tcl_Obj *CONST objv[])
 {
-  int j, n;
+  Tcl_Size j, n;
   Tcl_Obj **impObj;
   double dither, noise;
   iirFilter_t iir = (iirFilter_t) f;

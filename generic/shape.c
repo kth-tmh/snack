@@ -194,7 +194,7 @@ int shapeCmd(Sound *s, Tcl_Interp *interp, int objc,
         }
       case SHAPE:
         {
-          int nchar = 0;
+          Tcl_Size nchar = 0;
           char *str = Tcl_GetStringFromObj(objv[arg+1], &nchar);
           if (nchar > 0 && (preshp = Snack_GetSound(interp, str)) == NULL) {
             return TCL_ERROR;
@@ -203,7 +203,7 @@ int shapeCmd(Sound *s, Tcl_Interp *interp, int objc,
         }
       case BYTEORDER:
         {
-          int length;
+          Tcl_Size length;
           char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
           
           if (strncasecmp(str, "littleEndian", length) == 0) {
@@ -417,7 +417,7 @@ int dataSamplesCmd(Sound *s, Tcl_Interp *interp, int objc,
       }
     case BYTEORDER:
       {
-        int length;
+        Tcl_Size length;
         char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 
         if (strncasecmp(str, "littleEndian", length) == 0) {
