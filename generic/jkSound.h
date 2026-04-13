@@ -604,11 +604,7 @@ extern void Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[],
 
 extern void SnackPauseAudio();
 
-/* Always use the Tcl 8.4+ Tcl_Seek/Tcl_Tell API.
- * Tcl_SeekOld/Tcl_TellOld (int-offset wrappers) were available in Tcl 8.4-8.x
- * but removed in Tcl 9 and not reliably exported in all Tcl 8.6 builds.
- * Tcl_Seek/Tcl_Tell (Tcl_WideInt offset) work in Tcl 8.4 through Tcl 9.
- */
+#if 1 || TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4
 #define TCL_SEEK Tcl_Seek
 #define TCL_TELL Tcl_Tell
 
