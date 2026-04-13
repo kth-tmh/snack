@@ -7,12 +7,8 @@ by Kevin Russell and Kare Sjolander
 last modified: Mar 28, 2003
 """
 
-try:
-    import tkinter
-    import tkinter as Tkinter
-except ImportError:
-    import Tkinter
-    import Tkinter as tkinter
+import tkinter as Tkinter
+import string
 
 Tkroot = None
 audio = None
@@ -23,7 +19,6 @@ def initializeSnack(newroot):
     Tkroot = newroot
     Tkroot.tk.call('eval', 'package require snack')
     Tkroot.tk.call('snack::createIcons')
-    Tkroot.tk.call('snack::setUseOldObjAPI')
     audio = AudioControllerSingleton()
     mixer = MixerControllerSingleton()
 
@@ -127,8 +122,7 @@ class Sound (TkObject):
             if Tkroot:
                 master = Tkroot
             else:
-                raise RuntimeError(
-                      'Tk not initialized or not registered with Snack')
+                raise RuntimeError('Tk not intialized or not registered with Snack')
         self.tk = master.tk
         if not name:
             self.name = self.tk.call(('sound',) + self._options(kw))
@@ -264,7 +258,7 @@ class Sound (TkObject):
         
     def pitch(self, method=None, **kw):
         """Returns a list of pitch values."""
-        if method is None or method is "amdf" or method is "AMDF":
+        if method is None or method == "amdf" or method == "AMDF":
             result = self.tk.call((self.name, 'pitch') + self._options(kw))
             return self._getdoubles(result)
         else:
@@ -412,8 +406,7 @@ class Filter(TkObject):
         if Tkroot:
             master = Tkroot
         else:
-            raise RuntimeError(
-                 'Tk not initialized or not registered with Snack')
+            raise RuntimeError('Tk not intialized or not registered with Snack')
         self.tk = master.tk
         self.name = self.tk.call(('snack::filter', name) + args +
                                  self._options(kw))
