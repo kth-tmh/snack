@@ -174,6 +174,8 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     Tcl_Write(snackDebugChannel, "Snack patch level: ", 19);
     if (patchLevelStr != NULL) {
       Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
+    } else {
+      Tcl_Write(snackDebugChannel, "unknown", 7);
     }
     Tcl_Write(snackDebugChannel, "\n", 1);
     Tcl_Flush(snackDebugChannel);
