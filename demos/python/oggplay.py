@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 #
 # Usage: oggplay.py file.ogg
 #
@@ -6,7 +6,7 @@
 # by tkSnack
 
 import sys
-from tkinter import *
+from Tkinter import *
 from tkSnack import *
 
 initializeSnack(Tkinter.Tk())
@@ -19,4 +19,4 @@ if sys.argv[1:]:
 	snd = Sound(file=sys.argv[1])
 	snd.play(blocking=1)
 else:
-	print("Usage: oggplay.py file.ogg")
+	print "Usage: oggplay.py file.ogg"

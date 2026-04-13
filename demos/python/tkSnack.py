@@ -7,7 +7,8 @@ by Kevin Russell and Kare Sjolander
 last modified: Mar 28, 2003
 """
 
-import tkinter as Tkinter
+import Tkinter
+import types
 import string
 
 Tkroot = None
@@ -19,6 +20,7 @@ def initializeSnack(newroot):
     Tkroot = newroot
     Tkroot.tk.call('eval', 'package require snack')
     Tkroot.tk.call('snack::createIcons')
+    Tkroot.tk.call('snack::setUseOldObjAPI')
     audio = AudioControllerSingleton()
     mixer = MixerControllerSingleton()
 
@@ -90,7 +92,7 @@ class TkObject:
                 self.tk.call(self.name, 'configure')):
                 cnf[x[0][1:]] = (x[0][1:],) + x[1:]
                 return cnf
-        if isinstance(cnf, str):
+        if type(cnf) is types.StringType:
             x = self.tk.split(self.tk.call(self.name, 'configure', '-'+cnf))
             return (x[0][1:],) + x[1:]
         self.tk.call((self.name, 'configure') + self._options(cnf))
@@ -122,7 +124,8 @@ class Sound (TkObject):
             if Tkroot:
                 master = Tkroot
             else:
-                raise RuntimeError('Tk not intialized or not registered with Snack')
+                raise RuntimeError, \
+                      'Tk not intialized or not registered with Snack'
         self.tk = master.tk
         if not name:
             self.name = self.tk.call(('sound',) + self._options(kw))
@@ -258,7 +261,7 @@ class Sound (TkObject):
         
     def pitch(self, method=None, **kw):
         """Returns a list of pitch values."""
-        if method is None or method == "amdf" or method == "AMDF":
+        if method is None or method is "amdf" or method is "AMDF":
             result = self.tk.call((self.name, 'pitch') + self._options(kw))
             return self._getdoubles(result)
         else:
@@ -406,7 +409,8 @@ class Filter(TkObject):
         if Tkroot:
             master = Tkroot
         else:
-            raise RuntimeError('Tk not intialized or not registered with Snack')
+            raise RuntimeError, \
+                 'Tk not intialized or not registered with Snack'
         self.tk = master.tk
         self.name = self.tk.call(('snack::filter', name) + args +
                                  self._options(kw))
@@ -533,7 +537,7 @@ class SoundFrame(Tkinter.Frame):
         self.sound.record()
         
     def info(self):
-        print(self.sound.info())
+        print self.sound.info()
         
 def createSpectrogram(canvas, *args, **kw):
     """Draws a spectrogram of a sound on canvas."""

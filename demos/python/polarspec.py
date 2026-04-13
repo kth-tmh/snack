@@ -1,6 +1,6 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
-from tkinter import *
+from Tkinter import *
 from tkSnack import *
 from math import *
 
