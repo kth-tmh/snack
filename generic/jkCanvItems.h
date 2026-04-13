@@ -104,7 +104,9 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #endif
 
 #if defined(WIN) || defined(MAC) || defined(MAC_OSX_TK)
+#  ifndef XFree
 #  define XFree(data) {if ((data) != NULL) ckfree((char *) (data));}
+#  endif
 #endif
 
 #if defined MAC
@@ -122,14 +124,14 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #endif
 
 #if TK_MAJOR_VERSION >= 9
-#  define SNACK_CANVAS_CREATE_ARGS int objc, Tcl_Obj *const objv[]
-#  define SNACK_CANVAS_COORD_ARGS int objc, Tcl_Obj *const objv[]
-#  define SNACK_CANVAS_CONFIG_ARGS int objc, Tcl_Obj *const objv[], int flags
-#  define SNACK_CANVAS_SET_ARGC(objc, argc) const int argc = objc
+#  define SNACK_CANVAS_CREATE_ARGS Tcl_Size objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_COORD_ARGS Tcl_Size objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_CONFIG_ARGS Tcl_Size objc, Tcl_Obj *const objv[], int flags
+#  define SNACK_CANVAS_SET_ARGC(objc, argc) const Tcl_Size argc = objc
 #  define SNACK_CANVAS_ARG(argv, objv, i) Tcl_GetString((objv)[i])
 #  define SNACK_CANVAS_PREPARE_ARGV(argc, argv, objv) \
      do { \
-       int snack_i; \
+       Tcl_Size snack_i; \
        (argv) = (const char **) ckalloc((unsigned) (argc) * sizeof(char *)); \
        for (snack_i = 0; snack_i < (argc); snack_i++) { \
          (argv)[snack_i] = Tcl_GetString((objv)[snack_i]); \
