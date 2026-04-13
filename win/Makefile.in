@@ -43,7 +43,6 @@ jkCanvSpeg.c \
 jkCanvWave.c \
 jkFilter.c \
 jkFilterIIR.c \
-jkFormatMP3.c \
 jkMixer.c \
 jkPitchCmd.c \
 jkSound.c \
@@ -69,7 +68,6 @@ jkAudio.o \
 jkAudIO_win.o \
 jkFilter.o \
 jkFilterIIR.o \
-jkFormatMP3.o \
 jkMixer.o \
 jkPitchCmd.o \
 jkSound.o \
