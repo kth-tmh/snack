@@ -213,6 +213,8 @@ class Sound (TkObject):
         """Returns a list of formant trajectories."""
         result = self.tk.call((self.name, 'formant') + self._options(kw))
         return list(map(self._getdoubles, self.tk.splitlist(result)))
+
+    def flush(self):
         """Removes all audio data from the sound."""
         self.tk.call(self.name, 'flush')
 
@@ -269,6 +271,8 @@ class Sound (TkObject):
             result = self.tk.call((self.name, 'pitch', '-method', method) + 
                                   self._options(kw))
             return list(map(self._getdoubles, self.tk.splitlist(result)))
+
+    def play(self, **kw):
         """Plays the sound."""
         self.tk.call((self.name, 'play') + self._options(kw))
 
