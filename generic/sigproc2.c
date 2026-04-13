@@ -13,6 +13,8 @@
 
 
 static double *pxl,*pa,*py,*pyl,*pa1,*px;
+static int lbpoly(double *a, int order, double *rootr, double *rooti);
+
 void dlwrtrn(a,n,x,y)
 double *a,*x,*y; int *n;
 /*	routine to solve ax=y with cholesky 
@@ -76,7 +78,6 @@ int *n;
 					*/
 {
 	double sm;
-	double sqrt();
 	int m;
 	*det = 1.;
 	m = 0;
@@ -118,7 +119,7 @@ int *n;
 				*/
 {
 	double ee;
-	double sqrt(),ps,ps1,thres,d;
+	double ps,ps1,thres,d;
 	int m,n1;
 	m = dchlsky(p,n,c,&d);
 	dlwrtrn(p,n,c,s);
@@ -1128,8 +1129,6 @@ int covar2(xx,m,n,istrt,y,alpha,r0,preemp)
  return(TRUE);
 }
 
-int lbpoly(); 
-	 
 /*      ----------------------------------------------------------      */
 /* Find the roots of the LPC denominator polynomial and convert the z-plane
 	zeros to equivalent resonant frequencies and bandwidths.	*/
@@ -1548,7 +1547,7 @@ int qquad(a,b,c,r1r,r1i,r2r,r2i) /* find x, where a*x**2 + b*x + c = 0 	*/
 double	a, b, c;
 double *r1r, *r2r, *r1i, *r2i; /* return real and imag. parts of roots */
 {
-double  sqrt(), numi;
+double  numi;
 double  den, y;
 
 	if(a == 0.0){
@@ -1707,4 +1706,3 @@ int lbpoly(a, order, rootr, rooti) /* return FALSE on error */
 
     return(TRUE);
 }
-
