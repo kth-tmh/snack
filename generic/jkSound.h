@@ -607,6 +607,7 @@ extern void SnackPauseAudio();
 #if 1 || TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4
 #define TCL_SEEK Tcl_Seek
 #define TCL_TELL Tcl_Tell
+#endif
 
 #define SNACK_DB 4.34294481903251830000000 /*  = 10 / ln(10)  */
 #define SNACK_INTLOGARGMIN 1.0
