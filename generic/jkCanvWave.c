@@ -191,12 +191,10 @@ static Tk_ConfigSpec configSpecs[] = {
   static int    ComputeWaveCoords(Tk_Item *itemPtr);
   
   static int    ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, 
-			      Tk_Item *itemPtr, int argc,
-			      char **argv, int flags);
+			      Tk_Item *itemPtr, SNACK_CANVAS_CONFIG_ARGS);
 
   static int    CreateWave(Tcl_Interp *interp, Tk_Canvas canvas,
-			   struct Tk_Item *itemPtr,
-			   int argc, char **argv);
+			   struct Tk_Item *itemPtr, SNACK_CANVAS_CREATE_ARGS);
 
   static void   DeleteWave(Tk_Canvas canvas, Tk_Item *itemPtr,
 			   Display *display);
@@ -213,7 +211,7 @@ static Tk_ConfigSpec configSpecs[] = {
 			      double deltaX, double deltaY);
   
   static int    WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas,
-			   Tk_Item *itemPtr, int argc, char **argv);
+			   Tk_Item *itemPtr, SNACK_CANVAS_COORD_ARGS);
   
   static int    WaveToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
 			   double *rectPtr);
@@ -253,9 +251,10 @@ Tk_ItemType snackWaveType = {
 
 static int
 CreateWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-	   int argc, char **argv)
+	   SNACK_CANVAS_CREATE_ARGS)
 {
   WaveItem *wavePtr = (WaveItem *) itemPtr;
+  SNACK_CANVAS_SET_ARGC(objc, argc);
 
   if (argc < 2) {
     Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -313,11 +312,19 @@ CreateWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   wavePtr->x = 0;
   wavePtr->y = 0;
 
-  if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wavePtr->x) != TCL_OK) ||
-      (Tk_CanvasGetCoord(interp, canvas, argv[1], &wavePtr->y) != TCL_OK))
+  if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
+			 &wavePtr->x) != TCL_OK) ||
+      (Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
+			 &wavePtr->y) != TCL_OK))
     return TCL_ERROR;
   
-  if (ConfigureWave(interp, canvas, itemPtr, argc-2, argv+2, 0) == TCL_OK)
+  if (ConfigureWave(interp, canvas, itemPtr,
+#if TK_MAJOR_VERSION >= 9
+		    objc - 2, objv + 2,
+#else
+		    argc - 2, argv + 2,
+#endif
+		    0) == TCL_OK)
     return TCL_OK;
 
   DeleteWave(canvas, itemPtr, Tk_Display(Tk_CanvasTkwin(canvas)));
@@ -390,19 +397,22 @@ WaveMaxMin(WaveItem *wavePtr, SnackLinkedFileInfo *info, int start, int stop,
 }
 
 static int
-WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
-	   char **argv)
+WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
+	   SNACK_CANVAS_COORD_ARGS)
 {
   WaveItem *wPtr = (WaveItem *) itemPtr;
   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+  SNACK_CANVAS_SET_ARGC(objc, argc);
 
   if (argc == 0) {
     Tcl_PrintDouble(interp, wPtr->x, xc);
     Tcl_PrintDouble(interp, wPtr->y, yc);
     Tcl_AppendResult(interp, xc, " ", yc, (char *) NULL);
   } else if (argc == 2) {
-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+    if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
+			   &wPtr->x) != TCL_OK) ||
+	(Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
+			   &wPtr->y) != TCL_OK)) {
       return TCL_ERROR;
     }
     ComputeWaveBbox(canvas, wPtr);
@@ -889,7 +899,7 @@ UpdateWave(ClientData clientData, int flag)
 
 static int
 ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-	      int argc, char **argv, int flags)
+	      SNACK_CANVAS_CONFIG_ARGS)
 {
   WaveItem *wavePtr = (WaveItem *) itemPtr;
   Sound *s = wavePtr->sound;
@@ -899,18 +909,29 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   unsigned long mask;
   int doCompute = 0, oldMode;
   int i, j;
+  int result = TCL_OK;
+  SNACK_CANVAS_SET_ARGC(objc, argc);
+  const char **cfgArgv = NULL;
 
   if (argc == 0) return TCL_OK;
 
+#if TK_MAJOR_VERSION >= 9
+  SNACK_CANVAS_PREPARE_ARGV(argc, cfgArgv, objv);
+#else
+  cfgArgv = (const char **) argv;
+#endif
   if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
-			 (CONST84 char **)argv,
-			 (char *) wavePtr, flags) != TCL_OK) return TCL_ERROR;
+			 (CONST84 char **)cfgArgv,
+			 (char *) wavePtr, flags) != TCL_OK) {
+    SNACK_CANVAS_FREE_ARGV(cfgArgv);
+    return TCL_ERROR;
+  }
 
   if (wavePtr->debug > 1) Snack_WriteLog("  Enter ConfigureWave\n");
 
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     for (j = 0; j < argc; j += 2) {
-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+      if (strncmp(cfgArgv[j], configSpecs[i].argvName, strlen(cfgArgv[j])) == 0) {
 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
 	break;
       }
@@ -919,25 +940,25 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 #if defined(MAC)
   for (i = 0; i < argc; i++) {
-    if (strncmp(argv[i], "-anchor", strlen(argv[i])) == 0) {
+    if (strncmp(cfgArgv[i], "-anchor", strlen(cfgArgv[i])) == 0) {
       i++;
-      if (strcmp(argv[i], "ne") == 0) {
+      if (strcmp(cfgArgv[i], "ne") == 0) {
 	wavePtr->anchor = 1;
-      } else if (strcmp(argv[i], "nw") == 0) {
+      } else if (strcmp(cfgArgv[i], "nw") == 0) {
 	wavePtr->anchor = 7;
-      } else if (strcmp(argv[i], "n") == 0) {
+      } else if (strcmp(cfgArgv[i], "n") == 0) {
 	wavePtr->anchor = 0;
-      } else if (strcmp(argv[i], "e") == 0) {
+      } else if (strcmp(cfgArgv[i], "e") == 0) {
 	wavePtr->anchor = 2;
-      } else if (strcmp(argv[i], "se") == 0) {
+      } else if (strcmp(cfgArgv[i], "se") == 0) {
 	wavePtr->anchor = 3;
-      } else if (strcmp(argv[i], "sw") == 0) {
+      } else if (strcmp(cfgArgv[i], "sw") == 0) {
 	wavePtr->anchor = 5;
-      } else if (strcmp(argv[i], "s") == 0) {
+      } else if (strcmp(cfgArgv[i], "s") == 0) {
 	wavePtr->anchor = 4;
-      } else if (strcmp(argv[i], "w") == 0) {
+      } else if (strcmp(cfgArgv[i], "w") == 0) {
 	wavePtr->anchor = 6;
-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
+      } else if (strncmp(cfgArgv[i], "center", strlen(cfgArgv[i])) == 0) {
 	wavePtr->anchor = 8;
       }
       break;
@@ -952,12 +973,14 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       wavePtr->id = 0;
     } else {
       if ((s = Snack_GetSound(interp, wavePtr->newSoundName)) == NULL) {
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_CHANNEL) {
 	Tcl_AppendResult(interp, wavePtr->newSoundName, 
 			 " can not be linked to a channel", (char *) NULL);
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_FILE) {
 	s->itemRefCnt++;
@@ -1078,7 +1101,8 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   if (OptSpecified(OPTION_CHANNEL)) {
     if (GetChannel(interp, wavePtr->channelStr, wavePtr->nchannels, 
 		   &wavePtr->channelSet) != TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -1145,18 +1169,20 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
   if (doCompute) {
     if (ComputeWaveCoords(itemPtr) != TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
   }
 
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     configSpecs[i].specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
   }
-  
+done:
   if (wavePtr->debug > 1)
     Snack_WriteLogInt("  Exit ConfigureWave", wavePtr->width);
 
-  return TCL_OK;
+  SNACK_CANVAS_FREE_ARGV(cfgArgv);
+  return result;
 }
 
 static void

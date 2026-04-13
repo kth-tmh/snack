@@ -121,6 +121,31 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #   define TK_CONFIG_OPTION_SPECIFIED 0x4
 #endif
 
+#if TK_MAJOR_VERSION >= 9
+#  define SNACK_CANVAS_CREATE_ARGS int objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_COORD_ARGS int objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_CONFIG_ARGS int objc, Tcl_Obj *const objv[], int flags
+#  define SNACK_CANVAS_SET_ARGC(objc, argc) const int argc = objc
+#  define SNACK_CANVAS_ARG(argv, objv, i) Tcl_GetString((objv)[i])
+#  define SNACK_CANVAS_PREPARE_ARGV(argc, argv, objv) \
+     do { \
+       int snack_i; \
+       (argv) = (const char **) ckalloc((unsigned) (argc) * sizeof(char *)); \
+       for (snack_i = 0; snack_i < (argc); snack_i++) { \
+         (argv)[snack_i] = Tcl_GetString((objv)[snack_i]); \
+       } \
+     } while (0)
+#  define SNACK_CANVAS_FREE_ARGV(argv) ckfree((char *) (argv))
+#else
+#  define SNACK_CANVAS_CREATE_ARGS int argc, char **argv
+#  define SNACK_CANVAS_COORD_ARGS int argc, char **argv
+#  define SNACK_CANVAS_CONFIG_ARGS int argc, char **argv, int flags
+#  define SNACK_CANVAS_SET_ARGC(objc, argc) ((void) 0)
+#  define SNACK_CANVAS_ARG(argv, objv, i) (argv)[i]
+#  define SNACK_CANVAS_PREPARE_ARGV(argc, argv, objv) ((void) 0)
+#  define SNACK_CANVAS_FREE_ARGV(argv) ((void) 0)
+#endif
+
 #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)
 
 #ifdef __cplusplus

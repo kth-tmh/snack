@@ -210,23 +210,12 @@ static Tk_ConfigSpec configSpecs[] = {
 static void   ComputeSpectrogramBbox(Tk_Canvas canvas,
 				     SpectrogramItem *spegPtr);
 
-#if TK_MAJOR_VERSION >= 9
 static int    ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
-				   Tk_Item *itemPtr, int objc,
-				   Tcl_Obj *const objv[], int flags);
+				   Tk_Item *itemPtr, SNACK_CANVAS_CONFIG_ARGS);
 
 static int    CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
 				struct Tk_Item *itemPtr,
-				int objc, Tcl_Obj *const objv[]);
-#else
-static int    ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
-				   Tk_Item *itemPtr, int argc,
-				   char **argv, int flags);
-
-static int    CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
-				struct Tk_Item *itemPtr,
-				int argc, char **argv);
-#endif
+				SNACK_CANVAS_CREATE_ARGS);
 
 static void   DeleteSpectrogram(Tk_Canvas canvas, Tk_Item *itemPtr,
 				Display *display);
@@ -239,14 +228,8 @@ static void   ScaleSpectrogram(Tk_Canvas canvas, Tk_Item *itemPtr,
 			       double originX, double originY,
 			       double scaleX, double scaleY);
 
-#if TK_MAJOR_VERSION >= 9
 static int    SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas,
-				Tk_Item *itemPtr, int objc,
-				Tcl_Obj *const objv[]);
-#else
-static int    SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas,
-				Tk_Item *itemPtr, int argc, char **argv);
-#endif
+				Tk_Item *itemPtr, SNACK_CANVAS_COORD_ARGS);
 
 static int    SpectrogramToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
 				double *rectPtr);
@@ -294,18 +277,11 @@ Tk_ItemType snackSpectrogramType = {
 
 static int
 CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-#if TK_MAJOR_VERSION >= 9
-		  int objc, Tcl_Obj *const objv[])
-#else
-		  int argc, char **argv)
-#endif
+		  SNACK_CANVAS_CREATE_ARGS)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr; 
   Tk_Window tkwin = Tk_CanvasTkwin(canvas);
-
-#if TK_MAJOR_VERSION >= 9
-  const int argc = objc;
-#endif
+  SNACK_CANVAS_SET_ARGC(objc, argc);
  
   if (argc < 2) {
     Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -387,19 +363,9 @@ CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     return TCL_ERROR;
   }
 
-  if ((Tk_CanvasGetCoord(interp, canvas,
-#if TK_MAJOR_VERSION >= 9
-			 Tcl_GetString(objv[0]),
-#else
-			 argv[0],
-#endif
+  if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
 			 &spegPtr->x) != TCL_OK)
-      || (Tk_CanvasGetCoord(interp, canvas,
-#if TK_MAJOR_VERSION >= 9
-			    Tcl_GetString(objv[1]),
-#else
-			    argv[1],
-#endif
+      || (Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
 			    &spegPtr->y) != TCL_OK))
     return TCL_ERROR;
   
@@ -418,37 +384,20 @@ CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 static int
 SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-#if TK_MAJOR_VERSION >= 9
-		  int objc, Tcl_Obj *const objv[])
-#else
-		  int argc, char **argv)
-#endif
+		  SNACK_CANVAS_COORD_ARGS)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr;
   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE]; 
-
-#if TK_MAJOR_VERSION >= 9
-  const int argc = objc;
-#endif
+  SNACK_CANVAS_SET_ARGC(objc, argc);
  
   if (argc == 0) {
     Tcl_PrintDouble(interp, spegPtr->x, xc);
     Tcl_PrintDouble(interp, spegPtr->y, yc);
     Tcl_AppendResult(interp, xc, " ", yc, (char *) NULL);
   } else if (argc == 2) {
-    if ((Tk_CanvasGetCoord(interp, canvas,
-#if TK_MAJOR_VERSION >= 9
-			   Tcl_GetString(objv[0]),
-#else
-			   argv[0],
-#endif
+    if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
 			   &spegPtr->x) != TCL_OK) ||
-	(Tk_CanvasGetCoord(interp, canvas,
-#if TK_MAJOR_VERSION >= 9
-			   Tcl_GetString(objv[1]),
-#else
-			   argv[1],
-#endif
+	(Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
 			   &spegPtr->y) != TCL_OK)) {
       return TCL_ERROR;
     }
@@ -626,11 +575,7 @@ UpdateSpeg(ClientData clientData, int flag)
 
 static int
 ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-#if TK_MAJOR_VERSION >= 9
-		     int objc, Tcl_Obj *const objv[], int flags)
-#else
-		     int argc, char **argv, int flags)
-#endif
+		     SNACK_CANVAS_CONFIG_ARGS)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr;
   Sound *s = spegPtr->sound;
@@ -638,27 +583,23 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   XGCValues gcValues;
   int doCompute = 0;
   int i, j;
-  const char **argv = NULL;
-#if TK_MAJOR_VERSION >= 9
-  const int argc = objc;
-#endif
+  int result = TCL_OK;
+  SNACK_CANVAS_SET_ARGC(objc, argc);
+  const char **cfgArgv = NULL;
 
   if (argc == 0) return TCL_OK;
 
   /*  if (spegPtr->si.computing) return TCL_OK;*/
 
 #if TK_MAJOR_VERSION >= 9
-  argv = (const char **) ckalloc((unsigned) objc * sizeof(char *));
-  for (i = 0; i < objc; i++) {
-    argv[i] = Tcl_GetString(objv[i]);
-  }
+  SNACK_CANVAS_PREPARE_ARGV(argc, cfgArgv, objv);
+#else
+  cfgArgv = (const char **) argv;
 #endif
   if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
-			 (CONST84 char **)argv, 
+			 (CONST84 char **)cfgArgv,
 			 (char *) spegPtr, flags) != TCL_OK) {
-#if TK_MAJOR_VERSION >= 9
-    ckfree((char *) argv);
-#endif
+    SNACK_CANVAS_FREE_ARGV(cfgArgv);
     return TCL_ERROR;
   }
 
@@ -666,7 +607,7 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     for (j = 0; j < argc; j += 2) {
-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+      if (strncmp(cfgArgv[j], configSpecs[i].argvName, strlen(cfgArgv[j])) == 0) {
 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
 	break;
       }
@@ -675,26 +616,26 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   
 #if defined(MAC) || defined(MAC_OSX_TCL)
   for (i = 0; i < argc; i++) {
-    int l = strlen(argv[i]);
-    if (l && strncmp(argv[i], "-anchor", l) == 0) {
+    int l = strlen(cfgArgv[i]);
+    if (l && strncmp(cfgArgv[i], "-anchor", l) == 0) {
       i++;
-      if (strcmp(argv[i], "ne") == 0) {
+      if (strcmp(cfgArgv[i], "ne") == 0) {
 	spegPtr->anchor = 1;
-      } else if (strcmp(argv[i], "nw") == 0) {
+      } else if (strcmp(cfgArgv[i], "nw") == 0) {
 	spegPtr->anchor = 7;
-      } else if (strcmp(argv[i], "n") == 0) {
+      } else if (strcmp(cfgArgv[i], "n") == 0) {
 	spegPtr->anchor = 0;
-      } else if (strcmp(argv[i], "e") == 0) {
+      } else if (strcmp(cfgArgv[i], "e") == 0) {
 	spegPtr->anchor = 2;
-      } else if (strcmp(argv[i], "se") == 0) {
+      } else if (strcmp(cfgArgv[i], "se") == 0) {
 	spegPtr->anchor = 3;
-      } else if (strcmp(argv[i], "sw") == 0) {
+      } else if (strcmp(cfgArgv[i], "sw") == 0) {
 	spegPtr->anchor = 5;
-      } else if (strcmp(argv[i], "s") == 0) {
+      } else if (strcmp(cfgArgv[i], "s") == 0) {
 	spegPtr->anchor = 4;
-      } else if (strcmp(argv[i], "w") == 0) {
+      } else if (strcmp(cfgArgv[i], "w") == 0) {
 	spegPtr->anchor = 6;
-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
+      } else if (strncmp(cfgArgv[i], "center", strlen(cfgArgv[i])) == 0) {
 	spegPtr->anchor = 8;
       }
       break;
@@ -702,10 +643,16 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
 #endif
 
-  if (CheckFFTlen(interp, spegPtr->si.fftlen) != TCL_OK) return TCL_ERROR;
+  if (CheckFFTlen(interp, spegPtr->si.fftlen) != TCL_OK) {
+    result = TCL_ERROR;
+    goto done;
+  }
 
   if (CheckWinlen(interp, spegPtr->si.winlen, spegPtr->si.fftlen) != TCL_OK)
-    return TCL_ERROR;
+    {
+      result = TCL_ERROR;
+      goto done;
+    }
 
   if (OptSpecified(OPTION_SOUND)) {
     if (spegPtr->newSoundName == NULL) {
@@ -716,12 +663,14 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       doCompute = 1;
     } else {
       if ((s = Snack_GetSound(interp, spegPtr->newSoundName)) == NULL) {
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_CHANNEL) {
 	Tcl_AppendResult(interp, spegPtr->newSoundName, 
 			 " can not be linked to a channel", (char *) NULL);
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_FILE) {
 	s->itemRefCnt++;
@@ -872,7 +821,8 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   if (OptSpecified(OPTION_CHANNEL)) {
     if (GetChannel(interp, spegPtr->channelstr, spegPtr->si.nchannels,
 		   &spegPtr->si.channelSet) != TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -890,7 +840,8 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     if (GetWindowType(interp, spegPtr->windowTypeStr,
 		      &spegPtr->si.windowTypeSet)
 	!= TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -910,7 +861,10 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
     n = ComputeSpeg(&spegPtr->si, nfft);
 
-    if (n < 0) return TCL_OK;
+    if (n < 0) {
+      result = TCL_OK;
+      goto done;
+    }
     spegPtr->infft = nfft;
   }
 
@@ -956,12 +910,10 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     configSpecs[i].specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
   }
-  
+done:
   if (spegPtr->si.debug > 1) Snack_WriteLog("  Exit ConfigureSpeg\n");
-#if TK_MAJOR_VERSION >= 9
-  ckfree((char *) argv);
-#endif
-  return TCL_OK;
+  SNACK_CANVAS_FREE_ARGV(cfgArgv);
+  return result;
 }
 
 static void
