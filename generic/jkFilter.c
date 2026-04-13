@@ -263,7 +263,7 @@ Snack_FilterCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   string = Tcl_GetStringFromObj(objv[1], &length);
 
   do {
-    snprintf(ids, sizeof(ids), "%s%d", string, ++id);
+    sprintf(ids, "%s%d", string, ++id);
   } while (Tcl_FindHashEntry(hTab, ids) != NULL);
   name = ids;
 

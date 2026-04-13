@@ -394,7 +394,7 @@ SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   } else {
     char buf[80];
 
-    snprintf(buf, sizeof(buf), "wrong # coordinates: expected 0 or 2, got %d", argc);
+    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
     return TCL_ERROR;
@@ -647,16 +647,14 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       }
       spegPtr->sound = s;
       if (spegPtr->soundName == NULL) {
-	size_t nlen = strlen(spegPtr->newSoundName) + 1;
-	spegPtr->soundName = ckalloc(nlen);
-	memcpy(spegPtr->soundName, spegPtr->newSoundName, nlen);
+	spegPtr->soundName = ckalloc(strlen(spegPtr->newSoundName)+1);
+	strcpy(spegPtr->soundName, spegPtr->newSoundName);
       }
       if (strcmp(spegPtr->soundName, spegPtr->newSoundName) != 0) {
-	size_t nlen = strlen(spegPtr->newSoundName) + 1;
 	Sound *t = Snack_GetSound(interp, spegPtr->soundName);
 	ckfree(spegPtr->soundName);
-	spegPtr->soundName = ckalloc(nlen);
-	memcpy(spegPtr->soundName, spegPtr->newSoundName, nlen);
+	spegPtr->soundName = ckalloc(strlen(spegPtr->newSoundName)+1);
+	strcpy(spegPtr->soundName, spegPtr->newSoundName);
 	spegPtr->ssmp = 0;
 	spegPtr->esmp = -1;
 	Snack_RemoveCallback(t, spegPtr->id);
@@ -1198,17 +1196,17 @@ SpectrogramToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
   Tcl_AppendResult(interp, "%% SPEG BEGIN\n", (char *) NULL);
 
-  snprintf(buffer, sizeof(buffer), "/pix %d string def\n%d %f translate\n", width,
+  sprintf(buffer, "/pix %d string def\n%d %f translate\n", width,
 	  spegPtr->header.x1, Tk_CanvasPsY(canvas,(double)spegPtr->header.y2));
   Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-  snprintf(buffer, sizeof(buffer), "%d %d scale\n", width/2, height/2);
+  sprintf(buffer, "%d %d scale\n", width/2, height/2);
   Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-  snprintf(buffer, sizeof(buffer), "%d %d 8\n", width, height);
+  sprintf(buffer, "%d %d 8\n", width, height);
   Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-  snprintf(buffer, sizeof(buffer), "[%d 0 0 %d 0 %d]\n", width, -height, height);
+  sprintf(buffer, "[%d 0 0 %d 0 %d]\n", width, -height, height);
   Tcl_AppendResult(interp, buffer, (char *) NULL);
 
   if (noColor) {
@@ -1217,7 +1215,7 @@ SpectrogramToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     
     for (y = 0; y < height; y++) {
       for (x = 0; x < width; x++) {
-	snprintf(buffer, sizeof(buffer), "%.2x", imageR[x + width * y]);
+	sprintf(buffer, "%.2x", imageR[x + width * y]);
 	Tcl_AppendResult(interp, buffer, (char *) NULL);
       }
       Tcl_AppendResult(interp, "\n", (char *) NULL);
@@ -1228,7 +1226,7 @@ SpectrogramToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   
     for (y = 0; y < height; y++) {
       for (x = 0; x < width; x++) {
-	snprintf(buffer, sizeof(buffer), "%.2x%.2x%.2x", imageR[x + width * y],
+	sprintf(buffer, "%.2x%.2x%.2x", imageR[x + width * y],
 		imageG[x + width * y], imageB[x + width * y]);
 	Tcl_AppendResult(interp, buffer, (char *) NULL);
       }
@@ -1808,12 +1806,10 @@ PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
   int i, j = 0;
 
   *freeProcPtr = TCL_DYNAMIC;
-  /* X11 color names can be up to 31 chars; allocate 32 per color plus "\n\0". */
-  buffer = (char *) ckalloc((size_t)spegPtr->si.ncolors * 32 + 2);
+  buffer = (char *) ckalloc(spegPtr->si.ncolors * 20);
   for (i = 0; i < spegPtr->si.ncolors; i++) {
-    j += (int) snprintf(&buffer[j], 32, "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
+    j += (int) sprintf(&buffer[j], "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
   }
-  buffer[j]     = '\n';
-  buffer[j + 1] = '\0';
+  sprintf(&buffer[j], "\n");
   return buffer;
 }

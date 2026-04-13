@@ -63,8 +63,7 @@ selectCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     devstr = Tcl_GetStringFromObj(objv[2], NULL);
     for (i = 0; i < n; i++) {
       if (strncmp(devstr, arr[i], strlen(devstr)) == 0 && found == 0) {
-	strncpy(defaultMixerDevice, arr[i], MAX_DEVICE_NAME_LENGTH - 1);
-	defaultMixerDevice[MAX_DEVICE_NAME_LENGTH - 1] = '\0';
+	strcpy(defaultMixerDevice, arr[i]);
 	found = 1;
       }
       ckfree(arr[i]);

@@ -1701,7 +1701,7 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   }
   if ((objc == 1) || (string[0] == '-')) {
     do {
-      snprintf(ids, sizeof(ids), "sound%d", ++id);
+      sprintf(ids, "sound%d", ++id);
     } while (Tcl_FindHashEntry(hTab, ids) != NULL);
     name = ids;
     arg1 = 1;
@@ -2108,7 +2108,7 @@ SetFcname(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
     Tcl_AppendResult(interp, "Could not allocate name buffer!", NULL);
     return TCL_ERROR;
   }
-  memcpy(s->fcname, str, (size_t)length + 1);
+  strcpy(s->fcname, str);
 
   return TCL_OK;
 }

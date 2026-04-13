@@ -95,7 +95,7 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     }
     str = Tcl_GetStringFromObj(objv[3], &len);
     snackDumpFile = (char *) ckalloc(len + 1);
-    memcpy(snackDumpFile, str, (size_t)len + 1);
+    strcpy(snackDumpFile, str);
   }
   if (debugLevel > 0) {
     patchLevelStr = Tcl_GetVar(interp, "sound::patchLevel", TCL_GLOBAL_ONLY);
@@ -292,7 +292,7 @@ Snack_WriteLogInt(char *str, int num)
 					    420);
   }
   Tcl_Write(snackDebugChannel, str, strlen(str));
-  snprintf(buf, sizeof(buf), " %d", num);
+  sprintf(buf, " %d", num);
   Tcl_Write(snackDebugChannel, buf, strlen(buf));
   Tcl_Write(snackDebugChannel, "\n", 1);
   Tcl_Flush(snackDebugChannel);

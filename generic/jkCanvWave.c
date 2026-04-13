@@ -409,7 +409,7 @@ WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
   } else {
     char buf[80];
 
-    snprintf(buf, sizeof(buf), "wrong # coordinates: expected 0 or 2, got %d", argc);
+    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
     return TCL_ERROR;
@@ -964,16 +964,14 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       }
       wavePtr->sound = s;
       if (wavePtr->soundName == NULL) {
-	size_t nlen = strlen(wavePtr->newSoundName) + 1;
-	wavePtr->soundName = ckalloc(nlen);
-	memcpy(wavePtr->soundName, wavePtr->newSoundName, nlen);
+	wavePtr->soundName = ckalloc(strlen(wavePtr->newSoundName)+1);
+	strcpy(wavePtr->soundName, wavePtr->newSoundName);
       }
       if (strcmp(wavePtr->soundName, wavePtr->newSoundName) != 0) {
-	size_t nlen = strlen(wavePtr->newSoundName) + 1;
 	Sound *t = Snack_GetSound(interp, wavePtr->soundName);
 	ckfree(wavePtr->soundName);
-	wavePtr->soundName = ckalloc(nlen);
-	memcpy(wavePtr->soundName, wavePtr->newSoundName, nlen);
+	wavePtr->soundName = ckalloc(strlen(wavePtr->newSoundName)+1);
+	strcpy(wavePtr->soundName, wavePtr->newSoundName);
 	wavePtr->width = 0;
 	wavePtr->ssmp    = 0;
 	wavePtr->esmp    = -1;
@@ -1436,7 +1434,7 @@ WaveToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int prepass)
   Tcl_AppendResult(interp, "%% WAVE BEGIN\n", (char *) NULL);
   
   for (i = 0; i < wavePtr->width; i++) {
-    snprintf(buffer, sizeof(buffer),
+    sprintf(buffer,
 	    "%.1f %.1f moveto\n%.1f %.1f lineto\n",
 	    x0[i] + xo, Tk_CanvasPsY(canvas, (double) 
 				     (-y0[i]/scale + yo+ wavePtr->height / 2)),
@@ -1444,7 +1442,7 @@ WaveToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int prepass)
 				     (-y1[i]/scale + yo+ wavePtr->height / 2)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
     if ((double)(wavePtr->esmp - wavePtr->ssmp)/wavePtr->width < 1.0) {
-      snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n",
+      sprintf(buffer, "%.1f %.1f lineto\n",
 	      x1[i] + xo + 1, Tk_CanvasPsY(canvas, (double) 
 		   (-y1[i]/scale + yo+ wavePtr->height / 2)));
       Tcl_AppendResult(interp, buffer, (char *) NULL);
@@ -1452,32 +1450,32 @@ WaveToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int prepass)
   }
 
   if (wavePtr->zeroLevel) {
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f moveto\n", (double) xo,
+    sprintf(buffer, "%.1f %.1f moveto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) (yo + wavePtr->height / 2)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
+    sprintf(buffer, "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) (yo + wavePtr->height / 2)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
   }
 
   if (wavePtr->frame) {
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
+    sprintf(buffer, "%.1f %.1f moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
+    sprintf(buffer, "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
+    sprintf(buffer, "%.1f %.1f lineto\n", (double) xo + wavePtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) (yo + wavePtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n", (double) xo,
+    sprintf(buffer, "%.1f %.1f lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) (yo + wavePtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    snprintf(buffer, sizeof(buffer), "%.1f %.1f lineto\n", (double) xo,
+    sprintf(buffer, "%.1f %.1f lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
   }
