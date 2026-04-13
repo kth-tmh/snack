@@ -1,0 +1,8 @@
+README
+pyproject.toml
+setup.py
+tkSnack.py
+tkSnack.egg-info/PKG-INFO
+tkSnack.egg-info/SOURCES.txt
+tkSnack.egg-info/dependency_links.txt
+tkSnack.egg-info/top_level.txt
