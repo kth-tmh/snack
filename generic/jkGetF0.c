@@ -642,7 +642,7 @@ static int lc_lin_fir(register float fc, int *nf, float *coef)
 /* Use parabolic interpolation over the three points defining the peak
  * vicinity to estimate the "true" peak. */
 static void peak(float *y,		/* vector of length 3 defining peak */
-		 float *xp, float *yp)	/* x,y values of parabolic peak fitting */
+		 float *xp, float *yp)	/* x,y values of parabolic peak fitting the input points */
 {
   register float a, c;
   
