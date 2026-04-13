@@ -1,6 +1,6 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.4 "$0" "$@"
+exec wish8.5 "$0" "$@"
 
 # This utility creates stand-alone executables from Snack Tcl scripts
 

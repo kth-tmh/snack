@@ -508,9 +508,16 @@ ASetPlayGain(int gain)
 
   g = g * 256 + g;
   ioctl(mfd, SOUND_MIXER_WRITE_VOLUME, &g);
-  ioctl(mfd, SOUND_MIXER_WRITE_PCM, &pcm_gain);
+  /*ioctl(mfd, SOUND_MIXER_WRITE_PCM, &pcm_gain); */
 }
 
+void
+ASetPCM(int pcm)
+{
+  int g = min(max(pcm, 0), 25700);
+
+  ioctl(mfd, SOUND_MIXER_WRITE_PCM, &g); 
+}
 int
 AGetRecGain()
 {

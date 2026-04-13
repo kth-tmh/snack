@@ -130,6 +130,7 @@ typedef struct Sound {
   Tcl_Obj *changeCmdPtr;
   unsigned int userFlag; /* User flags, for new file formats, etc */
   char *userData;        /* User data pointer */
+  int    globalRate;
 
 } Sound;
 

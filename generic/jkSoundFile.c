@@ -1786,7 +1786,7 @@ PutAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 }
 
 #define WAVE_FORMAT_PCM	1
-#ifndef WIN
+#ifndef WAVE_FORMAT_ALAW
 #  define WAVE_FORMAT_IEEE_FLOAT 3
 #  define WAVE_FORMAT_ALAW  6
 #  define WAVE_FORMAT_MULAW 7
@@ -1797,7 +1797,14 @@ static int
 GetHeaderBytes(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *buf, 
 	       int len)
 {
-  int rlen = Tcl_Read(ch, &buf[s->firstNRead], len - s->firstNRead);
+  int rlen;
+
+  if (len > max(CHANNEL_HEADER_BUFFER, HEADBUF)){
+    Tcl_AppendResult(interp, "Excessive header size", NULL);
+    return TCL_ERROR;
+  }
+
+  rlen = Tcl_Read(ch, &buf[s->firstNRead], len - s->firstNRead);
 
   if (rlen < len - s->firstNRead){
     Tcl_AppendResult(interp, "Failed reading header bytes", NULL);
@@ -3307,6 +3314,7 @@ Snack_FileFormat snackRawFormat = {
   (Snack_FileFormat *) NULL
 };
 
+#ifdef USE_OLD_MP3
 Snack_FileFormat snackMp3Format = {
   MP3_STRING,
   GuessMP3File,
@@ -3322,6 +3330,7 @@ Snack_FileFormat snackMp3Format = {
   ConfigMP3Header,
   (Snack_FileFormat *) NULL
 };
+#endif
 
 Snack_FileFormat snackSmpFormat = {
   SMP_STRING,
@@ -3436,8 +3445,12 @@ SnackDefineFileFormats(Tcl_Interp *interp)
 */
 {
   snackFileFormats        = &snackWavFormat;
+#ifdef BUILTIN_MP3
   snackWavFormat.nextPtr  = &snackMp3Format;
   snackMp3Format.nextPtr  = &snackAiffFormat;
+#else
+  snackWavFormat.nextPtr  = &snackAiffFormat;
+#endif
   snackAiffFormat.nextPtr = &snackAuFormat;
   snackAuFormat.nextPtr   = &snackSmpFormat;
   snackSmpFormat.nextPtr  = &snackCslFormat;
@@ -3572,8 +3585,13 @@ GetSample(SnackLinkedFileInfo *infoPtr, int index)
 	    Snack_WriteLogInt("  Read Tries", maxt-tries);
 	    Snack_WriteLogInt("  Read Samples", nRead);
 	  }
+	  if (tries<=0) {
+             Snack_ProgressCallback(s->cmdPtr, s->interp, "Tries exceeded", -1.0);
+	  }
 	  infoPtr->validSamples = nRead;
-	  memcpy(infoPtr->buffer, junkBuffer, nRead * sizeof(float));
+	  if (nRead>0) {
+	      memcpy(infoPtr->buffer, junkBuffer, nRead * sizeof(float));
+	  }
 	}
 
 	if (ff->readProc == NULL) { /* unpack block */

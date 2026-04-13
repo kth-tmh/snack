@@ -80,6 +80,11 @@ static char *mixerDeviceList[MAX_NUM_DEVICES];
 static int numMixDevs = 0;
 
 #include <dsound.h>
+#ifndef  WAVE_FORMAT_ALAW
+#define  WAVE_FORMAT_ALAW 0x0006
+#define  WAVE_FORMAT_MULAW 0x0007
+#endif
+
 #define DSBCAPS_CTRLDEFAULT 0x000000E0
 
 static char *DSOutDeviceList[MAX_NUM_DEVICES];
