@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install tcl-tk
+        run: brew install tcl-tk libtommath
 
       - name: Configure
         working-directory: unix
