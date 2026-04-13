@@ -114,6 +114,13 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
   extern double hypot(double x, double y);
 #endif
 
+/* TK_CONFIG_OPTION_SPECIFIED was removed in Tk 9; the bit value (0x4) is
+ * preserved here so that specFlags-based tracking of which options were
+ * explicitly set continues to work. */
+#ifndef TK_CONFIG_OPTION_SPECIFIED
+#   define TK_CONFIG_OPTION_SPECIFIED 0x4
+#endif
+
 #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)
 
 #ifdef __cplusplus
