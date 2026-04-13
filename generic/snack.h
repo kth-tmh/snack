@@ -26,6 +26,11 @@
 # define TCL_STORAGE_CLASS DLLEXPORT
 #endif
 
+/* Tcl 9 removed CONST; older Snack code still uses it in APIs like Tcl_Obj *CONST objv[] */
+#ifndef CONST
+#  define CONST const
+#endif
+
 #ifndef CONST84
 #   define CONST84
 #endif
