@@ -1,0 +1,1153 @@
+From: Sergei Golovan
+Subject: Patch excessively fixes FTBFS and warnings when Snack is
+ built using GCC 15.
+Date: Fri, 19 February 2025 17:44:21 +0300
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1097902
+
+--- a/generic/jkGetF0.c
++++ b/generic/jkGetF0.c
+@@ -36,8 +36,14 @@
+ 
+ int	    debug_level = 0;
+ 
++int init_dp_f0(double freq, F0_params *par, long *buffsize, long *sdstep);
++int dp_f0(float *fdata, int buff_size, int sdstep, double freq,
++          F0_params *par, float **f0p_pt, float **vuvp_pt, float **rms_speech_pt,
++          float **acpkp_pt, int *vecsize, int last_time);
+ void free_dp_f0();
+-static int check_f0_params();
++static int check_f0_params(Tcl_Interp *interp, F0_params *par, double sample_freq);
++void get_fast_cands(float *fdata, float *fdsdata, int ind, int step, int size, int dec, int start, int nlags,
++                    float *engref, int *maxloc, float *maxval, Cross *cp, float *peaks, int *locs, int *ncand, F0_params *par);
+ 
+ int
+ Get_f0(Sound *sound, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+@@ -49,7 +55,6 @@
+   F0_params *par, *read_f0_params();
+   float *f0p, *vuvp, *rms_speech, *acpkp;
+   int i, vecsize;
+-  int init_dp_f0(), dp_f0();
+   static int framestep = -1;
+   long sdstep = 0, total_samps;
+   int ndone = 0;
+@@ -305,17 +310,16 @@
+   return(error);
+ }
+ 
+-static void get_cand(), peak();
+-static int lc_lin_fir(), downsamp();
+-extern void do_ffir();
+-extern float *downsample();
++static void get_cand(Cross *cross, float *peak, int *loc, int nlags, int *ncand, float cand_thresh);
++static void peak(float *y, float *xp, float *yp);
++static int lc_lin_fir(register float fc, int *nf, float *coef);
++static int downsamp(float *in, float *out, int samples, int *outsamps, int state_idx, int decimate, int ncoef, float *fc, int init);
++extern void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init);
++extern float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time);
+ 
+ /* ----------------------------------------------------------------------- */
+-void get_fast_cands(fdata, fdsdata, ind, step, size, dec, start, nlags, engref, maxloc, maxval, cp, peaks, locs, ncand, par)
+-     float *fdata, *fdsdata, *engref, *maxval, *peaks;
+-     int size, start, nlags, *maxloc, *locs, *ncand, ind, step, dec;
+-     Cross *cp;
+-     F0_params *par;
++void get_fast_cands(float *fdata, float *fdsdata, int ind, int step, int size, int dec, int start, int nlags,
++                    float *engref, int *maxloc, float *maxval, Cross *cp, float *peaks, int *locs, int *ncand, F0_params *par)
+ {
+   int decind, decstart, decnlags, decsize, i, j, *lp;
+   float *corp, xp, yp, lag_wt;
+@@ -394,10 +398,7 @@
+ }
+ 
+ /* ----------------------------------------------------------------------- */
+-float *downsample(input,samsin,state_idx,freq,samsout,decimate, first_time, last_time)
+-     double freq;
+-     float *input;
+-      int samsin, *samsout, decimate, state_idx, first_time, last_time;
++float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time)
+ {
+   static float	b[2048];
+   static float *foutput = NULL;
+@@ -444,11 +445,7 @@
+ 
+ /* ----------------------------------------------------------------------- */
+ /* Get likely candidates for F0 peaks. */
+-static void get_cand(cross,peak,loc,nlags,ncand,cand_thresh)
+-     Cross *cross;
+-     float *peak, cand_thresh;
+-     int *loc;
+-     int  *ncand, nlags;
++static void get_cand(Cross *cross, float *peak, int *loc, int nlags, int *ncand, float cand_thresh)
+ {
+   register int i, lastl, *t;
+   register float o, p, q, *r, *s, clip;
+@@ -490,11 +487,7 @@
+ /* ----------------------------------------------------------------------- */
+ /* buffer-to-buffer downsample operation */
+ /* This is STRICTLY a decimator! (no upsample) */
+-static int downsamp(in, out, samples, outsamps, state_idx, decimate, ncoef, fc, init)
+-     float *in, *out;
+-     int samples, *outsamps, decimate, ncoef, state_idx;
+-     float fc[];
+-     int init;
++static int downsamp(float *in, float *out, int samples, int *outsamps, int state_idx, int decimate, int ncoef, float *fc, int init)
+ {
+   if(in && out) {
+     do_ffir(in, samples, out, outsamps, state_idx, ncoef, fc, 0, decimate, init);
+@@ -505,17 +498,13 @@
+ }
+ 
+ /*      ----------------------------------------------------------      */
+-void do_ffir(buf, in_samps, bufo, out_samps, idx, ncoef, fc, invert, skip, init)
++void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init)
+ /* fc contains 1/2 the coefficients of a symmetric FIR filter with unity
+     passband gain.  This filter is convolved with the signal in buf.
+     The output is placed in buf2.  If(invert), the filter magnitude
+     response will be inverted.  If(init&1), beginning of signal is in buf;
+     if(init&2), end of signal is in buf.  out_samps is set to the number of
+     output points placed in bufo. */
+-register float	*buf, *bufo;
+-float *fc;
+-register int in_samps, ncoef, invert, skip, init, *out_samps;
+-int idx;
+ {
+   register float *dp1, *dp2, *dp3, sum, integral;
+   static float *co=NULL, *mem=NULL;
+@@ -617,12 +606,9 @@
+ }
+ 
+ /*      ----------------------------------------------------------      */
+-static int lc_lin_fir(fc,nf,coef)
++static int lc_lin_fir(register float fc, int *nf, float *coef)
+ /* create the coefficients for a symmetric FIR lowpass filter using the
+    window technique with a Hanning window. */
+-register float	fc;
+-float	*coef;
+-int	*nf;
+ {
+     register int	i, n;
+     register double	twopi, fn, c;
+@@ -651,9 +637,9 @@
+ /* ----------------------------------------------------------------------- */
+ /* Use parabolic interpolation over the three points defining the peak
+  * vicinity to estimate the "true" peak. */
+-static void peak(y, xp, yp)
+-     float *y,			/* vector of length 3 defining peak */
+-       *xp, *yp;  /* x,y values of parabolic peak fitting the input points. */
++static void peak(float *y, float *xp, float *yp)
++     /* y: vector of length 3 defining peak */
++     /* xp, yp:  x,y values of parabolic peak fitting the input points. */
+ {
+   register float a, c;
+   
+@@ -763,9 +749,7 @@
+ 
+ /*--------------------------------------------------------------------*/
+ int
+-get_Nframes(buffsize, pad, step)
+-    long    buffsize;
+-    int     pad, step;
++get_Nframes(long buffsize, int pad, int step)
+ {
+   if (buffsize < pad)
+     return (0);
+@@ -776,10 +760,7 @@
+ 
+ /*--------------------------------------------------------------------*/
+ int
+-init_dp_f0(freq, par, buffsize, sdstep)
+-    double	freq;
+-    F0_params	*par;
+-    long	*buffsize, *sdstep;
++init_dp_f0(double freq, F0_params *par, long *buffsize, long *sdstep)
+ {
+   int nframes;
+   int i;
+@@ -926,18 +907,13 @@
+   return(0);
+ }
+ 
+-static Stat *get_stationarity();
++static Stat *get_stationarity(float *fdata, double freq, int buff_size, int nframes, int frame_step, int first_time);
+ 
+ /*--------------------------------------------------------------------*/
+ int
+-dp_f0(fdata, buff_size, sdstep, freq,
+-      par, f0p_pt, vuvp_pt, rms_speech_pt, acpkp_pt, vecsize, last_time)
+-    float	*fdata;
+-    int		buff_size, sdstep;
+-    double	freq;
+-    F0_params	*par;		/* analysis control parameters */
+-    float	**f0p_pt, **vuvp_pt, **rms_speech_pt, **acpkp_pt;
+-    int		*vecsize, last_time;
++dp_f0(float *fdata, int buff_size, int sdstep, double freq,
++      F0_params *par, float **f0p_pt, float **vuvp_pt, float **rms_speech_pt, float **acpkp_pt, int *vecsize, int last_time)
++/* par: analysis control parameters */
+ {
+   float  maxval, engref, *sta, *rms_ratio, *dsdata;
+   register float ttemp, ftemp, ft1, ferr, err, errmin;
+@@ -1269,8 +1245,7 @@
+ 
+ /*--------------------------------------------------------------------*/
+ Frame *
+-alloc_frame(nlags, ncands)
+-    int     nlags, ncands;
++alloc_frame(int nlags, int ncands)
+ {
+   Frame *frm;
+   int j;
+@@ -1307,11 +1282,7 @@
+ /* push window stat to stack, and pop the oldest one */
+ 
+ static int
+-save_windstat(rho, order, err, rms)
+-    float   *rho;
+-    int     order;
+-    float   err;
+-    float   rms;
++save_windstat(float *rho, int order, float err, float rms)
+ {
+     int i,j;
+ 
+@@ -1337,11 +1308,7 @@
+ 
+ /*--------------------------------------------------------------------*/
+ static int
+-retrieve_windstat(rho, order, err, rms)
+-    float   *rho;
+-    int     order;
+-    float   *err;
+-    float   *rms;
++retrieve_windstat(float *rho, int order, float *err, float *rms)
+ {
+     Windstat wstat;
+     int i;
+@@ -1359,18 +1326,11 @@
+ 
+ /*--------------------------------------------------------------------*/
+ static float
+-get_similarity(order, size, pdata, cdata,
+-	       rmsa, rms_ratio, pre, stab, w_type, init)
+-    int     order, size;
+-    float   *pdata, *cdata;
+-    float   *rmsa, *rms_ratio, pre, stab;
+-    int     w_type, init;
++get_similarity(int order, int size, float *pdata, float *cdata,
++	       float *rmsa, float *rms_ratio, float pre, float stab, int w_type, int init)
+ {
+   float rho3[BIGSORD+1], err3, rms3, rmsd3, b0, t, a2[BIGSORD+1], 
+       rho1[BIGSORD+1], a1[BIGSORD+1], b[BIGSORD+1], err1, rms1, rmsd1;
+-  float xitakura(), wind_energy();
+-  void xa_to_aca ();
+-  int xlpc();
+ 
+ /* (In the lpc() calls below, size-1 is used, since the windowing and
+    preemphasis function assumes an extra point is available in the
+@@ -1443,10 +1403,7 @@
+ static float *mem = NULL;
+ 
+ static Stat*
+-get_stationarity(fdata, freq, buff_size, nframes, frame_step, first_time)
+-    float   *fdata;
+-    double  freq;
+-    int     buff_size, nframes, frame_step, first_time;
++get_stationarity(float *fdata, double freq, int buff_size, int nframes, int frame_step, int first_time)
+ {
+   static int nframes_old = 0, memsize;
+   float preemp = 0.4f, stab = 30.0f;
+@@ -1623,7 +1580,6 @@
+   F0_params *par, *read_f0_params();
+   float *f0p, *vuvp, *rms_speech, *acpkp;
+   int i, vecsize;
+-  int init_dp_f0(), dp_f0();
+   static int framestep = -1;
+   long sdstep = 0, total_samps;
+   int ndone = 0;
+--- a/generic/jkGetF0.h
++++ b/generic/jkGetF0.h
+@@ -58,9 +58,17 @@
+ #define F0_PC_DIFF	0x010		/* 1st-order difference */
+ 
+ extern F0_params *new_f0_params();
+-extern int atoi(), eround(), lpc(), window(), get_window();
+-extern void get_fast_cands(), a_to_aca(), cross(), crossf(), crossfi(),
++extern int eround(register double flnum);
++extern int lpc(), get_window();
++extern int window(register float *din, register float *dout, register int n, register float preemp, int type);
++extern void a_to_aca(), cross(),
+            autoc(), durbin();
++extern void crossf(float *data, int size, int start, int nlags, float *engref, int *maxloc, float *maxval, float *correl);
++extern void crossfi(float *data, int size, int start0, int nlags0, int nlags, float *engref, int *maxloc, float *maxval, float *correl, int *locs, int nlocs);
++extern int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca, float *ar, float *lpck, float *normerr, float *rms, float preemp, int type);
++extern float wind_energy(register float *data, register int size, register int w_type);
++extern void xa_to_aca(float *a, float *b, float *c, register int p);
++extern float xitakura(register int p, register float *b, register float *c, register float *r, register float *gain);
+ 
+ #define Fprintf (void)fprintf
+ 
+@@ -106,4 +114,4 @@
+   struct frame_rec *prev;
+ } Frame;
+ 
+-extern   Frame *alloc_frame();
++extern   Frame *alloc_frame(int nlags, int ncands);
+--- a/generic/jkSoundProc.c
++++ b/generic/jkSoundProc.c
+@@ -62,7 +62,7 @@
+ CheckFFTlen(Tcl_Interp *interp, int fftlen)
+ {
+   int n = NMIN;
+-  char str[10];
++  char str[16];
+ 
+   while (n <= NMAX) {
+     if (n == fftlen) return TCL_OK;
+@@ -82,7 +82,7 @@
+ int
+ CheckWinlen(Tcl_Interp *interp, int winlen, int fftlen)
+ {
+-  char str[10];
++  char str[16];
+ 
+   if (winlen < 1) {
+     Tcl_AppendResult(interp, "-winlength must be > 0", NULL);
+--- a/generic/sigproc.c
++++ b/generic/sigproc.c
+@@ -31,9 +31,7 @@
+  * Dout is assumed to be at least n elements long.  Type is decoded in
+  * the switch statement below.
+  */
+-int xget_window(dout, n, type)
+-     register float *dout;
+-     register int n, type;
++int xget_window(register float *dout, register int n, register int type)
+ {
+   static float *din = NULL;
+   static int n0 = 0;
+@@ -57,10 +55,7 @@
+   
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* Apply a rectangular window (i.e. none).  Optionally, preemphasize. */
+-void xrwindow(din, dout, n, preemp)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
++void xrwindow(register float *din, register float *dout, register int n, register float preemp)
+ {
+   register float *p;
+  
+@@ -77,10 +72,7 @@
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* Generate a cos^4 window, if one does not already exist. */
+-void xcwindow(din, dout, n, preemp)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
++void xcwindow(register float *din, register float *dout, register int n, register float preemp)
+ {
+   register int i;
+   register float *p;
+@@ -112,10 +104,7 @@
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* Generate a Hamming window, if one does not already exist. */
+-void xhwindow(din, dout, n, preemp)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
++void xhwindow(register float *din, register float *dout, register int n, register float preemp)
+ {
+   register int i;
+   register float *p;
+@@ -145,10 +134,7 @@
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* Generate a Hanning window, if one does not already exist. */
+-void xhnwindow(din, dout, n, preemp)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
++void xhnwindow(register float *din, register float *dout, register int n, register float preemp)
+ {
+   register int i;
+   register float *p;
+@@ -181,11 +167,7 @@
+  * in din.  Return the floating-point result sequence in dout.  If preemp
+  * is non-zero, apply preemphasis to tha data as it is windowed.
+  */
+-int window(din, dout, n, preemp, type)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
+-     int type;
++int window(register float *din, register float *dout, register int n, register float preemp, int type)
+ {
+   switch(type) {
+   case 0:			/* rectangular */
+@@ -212,10 +194,7 @@
+  * Return the normalized autocorrelation coefficients in r.
+  * The rms is returned in e.
+  */
+-void xautoc( windowsize, s, p, r, e )
+-     register int p, windowsize;
+-     register float *s, *e;
+-     register float *r;
++void xautoc(register int windowsize, register float *s, register int p, register float *r, register float *e)
+ {
+   register int i, j;
+   register float *q, *t, sum, sum0;
+@@ -249,9 +228,8 @@
+  * Note: durbin returns the coefficients in normal sign format.
+  *	(i.e. a[0] is assumed to be = +1.)
+  */
+-void xdurbin ( r, k, a, p, ex)
+-     register int p;			/* analysis order */
+-     register float *r, *k, *a, *ex;
++void xdurbin (register float *r, register float *k, register float *a, register int p, register float *ex)
++     /* p: analysis order */
+ {
+   float  bb[BIGSORD];
+   register int i, j;
+@@ -285,9 +263,7 @@
+  *  The magnitude of a is returned in c.
+  *  2* the other autocorrelation coefficients are returned in b.
+  */
+-void xa_to_aca ( a, b, c, p )
+-float *a, *b, *c;
+-register int p;
++void xa_to_aca (float *a, float *b, float *c, register int p)
+ {
+   register float  s, *ap, *a0;
+   register int  i, j;
+@@ -313,9 +289,7 @@
+  * r is assumed normalized and r[0]=1 is not explicitely accessed.
+  * Values returned by the function are >= 1.
+  */
+-float xitakura ( p, b, c, r, gain )
+-     register float *b, *c, *r, *gain;
+-     register int p;
++float xitakura (register int p, register float *b, register float *c, register float *r, register float *gain)
+ {
+   register float s;
+ 
+@@ -330,10 +304,10 @@
+  * is weighted by a window of type w_type before RMS computation.  w_type
+  * is decoded above in window().
+  */
+-float wind_energy(data,size,w_type)
+-     register float *data;	/* input PCM data */
+-     register int size,		/* size of window */
+-       w_type;			/* window type */
++float wind_energy(register float *data, register int size, register int w_type)
++     /* data:   input PCM data */
++     /* size:   size of window */
++     /* w_type: window type */
+ {
+   static int nwind = 0;
+   static float *dwind = NULL;
+@@ -363,18 +337,18 @@
+ /* Generic autocorrelation LPC analysis of the short-integer data
+  * sequence in data.
+  */
+-int xlpc(lpc_ord,lpc_stabl,wsize,data,lpca,ar,lpck,normerr,rms,preemp,type)
+-     int lpc_ord,		/* Analysis order */
+-       wsize,			/* window size in points */
+-       type;		/* window type (decoded in window() above) */
+-     float lpc_stabl,	/* Stability factor to prevent numerical problems. */
+-       *lpca,		/* if non-NULL, return vvector for predictors */
+-       *ar,		/* if non-NULL, return vector for normalized autoc. */
+-       *lpck,		/* if non-NULL, return vector for PARCOR's */
+-       *normerr,		/* return scaler for normalized error */
+-       *rms,		/* return scaler for energy in preemphasized window */
+-       preemp;
+-     float *data;	/* input data sequence; assumed to be wsize+1 long */
++int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca, float *ar, float *lpck, float *normerr, float *rms, float preemp, int type)
++    /* lpc_ord:	Analysis order */
++    /* wsize:	window size in points */
++    /* type:	window type (decoded in window() above) */
++    /* lpc_stabl: Stability factor to prevent numerical problems. */
++    /* lpca:	if non-NULL, return vvector for predictors */
++    /* ar:	if non-NULL, return vector for normalized autoc. */
++    /* lpck:	if non-NULL, return vector for PARCOR's */
++    /* normerr:	return scaler for normalized error */
++    /* rms:	return scaler for energy in preemphasized window */
++    /* preemp: */
++    /* data:	input data sequence; assumed to be wsize+1 long */
+ {
+   static float *dwind=NULL;
+   static int nwind=0;
+@@ -443,10 +417,7 @@
+   correl is the array of nlags cross-correlation coefficients (-1.0 to 1.0)
+  *
+  */
+-void crossf(data, size, start, nlags, engref, maxloc, maxval, correl)
+-     int *maxloc;
+-     float *engref, *maxval, *data, *correl;
+-     int size, start, nlags;
++void crossf(float *data, int size, int start, int nlags, float *engref, int *maxloc, float *maxval, float *correl)
+ {
+   static float *dbdata=NULL;
+   static int dbsize = 0;
+@@ -540,10 +511,7 @@
+   nlocs is the number of correlation patches to compute.
+  *
+  */
+-void crossfi(data, size, start0, nlags0, nlags, engref, maxloc, maxval, correl, locs, nlocs)
+-     int *maxloc;
+-     float *engref, *maxval, *data, *correl;
+-     int size, start0, nlags0, nlags, *locs, nlocs;
++void crossfi(float *data, int size, int start0, int nlags0, int nlags, float *engref, int *maxloc, float *maxval, float *correl, int *locs, int nlocs)
+ {
+   static float *dbdata=NULL;
+   static int dbsize = 0;
+--- a/generic/jkAudIO.h
++++ b/generic/jkAudIO.h
+@@ -27,7 +27,7 @@
+ #endif
+ 
+ #ifndef CONST84
+-#   define CONST84
++#   define CONST84 const
+ #endif
+ 
+ #ifdef HPUX
+--- a/generic/jkFormant.c
++++ b/generic/jkFormant.c
+@@ -64,17 +64,16 @@
+ 
+ static short **pc;
+ 
+-static int canbe(pnumb, fnumb) /* can this pole be this freq.? */
+-int	pnumb, fnumb;
++static int canbe(int pnumb, int fnumb) /* can this pole be this freq.? */
+ {
+ return((fre[pnumb] >= fmins[fnumb])&&(fre[pnumb] <= fmaxs[fnumb]));
+ }
+ 
+ /* This does the real work of mapping frequencies to formants. */
+-static void candy(cand,pnumb,fnumb)
+-     int	cand, /* candidate number being considered */
+-       pnumb, /* pole number under consideration */
+-       fnumb;	/* formant number under consideration */
++static void candy(int cand, int pnumb, int fnumb)
++     /* cand:  candidate number being considered */
++     /* pnumb: pole number under consideration */
++     /* fnumb: formant number under consideration */
+ {
+   int i,j;
+ 
+@@ -117,10 +116,8 @@
+ /* Given a set of pole frequencies and allowable formant frequencies
+    for nform formants, calculate all possible mappings of pole frequencies
+    to formants, including, possibly, mappings with missing formants. */
+-void get_fcand(npole,freq,band,nform,pcan)
+-     int	npole, nform;
+-     short **pcan;
+-     double	*freq, *band; /* poles ordered by increasing FREQUENCY */
++void get_fcand(int npole, double *freq, double *band, int nform, short **pcan)
++     /* poles ordered by increasing FREQUENCY */
+ {	
+ 
+   ncan = 0;
+@@ -132,8 +129,7 @@
+   ncan++;	/* (converts ncan as an index to ncan as a candidate count) */
+ }
+ 
+-void set_nominal_freqs(f1)
+-     double f1;
++void set_nominal_freqs(double f1)
+ {
+   int i;
+   for(i=0; i < MAXFORMANTS; i++) {
+@@ -145,9 +141,7 @@
+ 
+ /*      ----------------------------------------------------------      */
+ /* find the maximum in the "stationarity" function (stored in rms) */
+-double get_stat_max(pole, nframes)
+-     register POLE **pole;
+-     register int nframes;
++double get_stat_max(register POLE **pole, register int nframes)
+ {
+   register int i;
+   register double amax, t;
+@@ -158,10 +152,7 @@
+   return(amax);
+ }
+ 
+-Sound *dpform(ps, nform, nom_f1)
+-     Sound *ps;
+-     int nform;
+-     double nom_f1;
++Sound *dpform(Sound *ps, int nform, double nom_f1)
+ {
+   double pferr, conerr, minerr, dffact, ftemp, berr, ferr, bfact, ffact,
+          rmsmax, fbias, **fr, **ba, rmsdffact, merger=0.0, merge_cost,
+@@ -436,11 +427,15 @@
+ 
+ #define MAXORDER 30
+ 
+-extern int formant(), lpc(), lpcbsa(), dlpcwtd(), w_covar();
++extern int dlpcwtd(double *s, int *ls, double *p, int *np, double *c, double *phi, double *shi, double *xl, double *w);
++extern int formant(int lpc_order, double s_freq, double *lpca, int *n_form, double *freq, double *band, int init);
++extern int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data, double *lpca,
++        double *ar, double *lpck, double *normerr, double *rms, double preemp, int type);
++extern int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp);
++extern int w_covar(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp, int w_type);
+ 
+ /*************************************************************************/
+-double integerize(time, freq)
+-     register double time, freq;
++double integerize(register double time, register double freq)
+ {
+   register int i;
+ 
+@@ -449,17 +444,13 @@
+ }
+ 
+ /*	Round the argument to the nearest integer.			*/
+-int eround(flnum)
+-register double	flnum;
++int eround(register double	flnum)
+ {
+ 	return((flnum >= 0.0) ? (int)(flnum + 0.5) : (int)(flnum - 0.5));
+ }
+ 
+ /*************************************************************************/
+-Sound *lpc_poles(sp,wdur,frame_int,lpc_ord,preemp,lpc_type,w_type)
+-     Sound *sp;
+-     int lpc_ord, lpc_type, w_type;
+-     double wdur, frame_int, preemp;
++Sound *lpc_poles(Sound *sp, double wdur, double frame_int, int lpc_ord, double preemp, int lpc_type, int w_type)
+ {
+   int i, j, size, step, nform, init, nfrm;
+   POLE **pole;
+@@ -566,10 +557,7 @@
+ /* a quick and dirty interface to bsa's stabilized covariance LPC */
+ #define NPM	30	/* max lpc order		*/
+ 
+-int lpcbsa(np, lpc_stabl, wind, data, lpc, rho, nul1, nul2, energy, preemp)
+-     int np, wind;
+-     short *data;
+-     double *lpc, *rho, *nul1, *nul2, *energy, lpc_stabl, preemp;
++int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp)
+ {
+   static int i, mm, owind=0, wind1;
+   static double w[1000];
+@@ -606,9 +594,7 @@
+ 
+ /*      ----------------------------------------------------------      */
+ 
+-int ratprx(a,k,l,qlim)
+-double	a;    
+-int	*l, *k, qlim;
++int ratprx(double a, int *k, int *l, int qlim)
+ {
+     double aa, af, q, em, qq = 0, pp = 0, ps, e;
+     int	ai, ip, result = FALSE;
+@@ -637,13 +623,9 @@
+ 
+ /* ----------------------------------------------------------------------- */
+ 
+-extern float *downsample();
++extern float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time);
+ 
+-Sound *Fdownsample(s,freq2,start,end)
+-     double freq2;
+-     Sound *s;
+-     int start;
+-     int end;
++Sound *Fdownsample(Sound *s, double freq2, int start, int end)
+ {
+   float	*bufin, *bufout, *bufp;
+   int	frame_size = 1024, act_size, first_time, last_time;
+@@ -729,10 +711,9 @@
+ 
+ /*      ----------------------------------------------------------      */
+ 
+-extern void do_ffir();
++extern void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init);
+ 
+-Sound *highpass(s)
+-     Sound *s;
++Sound *highpass(Sound *s)
+ {
+ 
+   float *datain, *dataout;
+--- a/generic/sigproc2.c
++++ b/generic/sigproc2.c
+@@ -13,8 +13,7 @@
+ 
+ 
+ static double *pxl,*pa,*py,*pyl,*pa1,*px;
+-void dlwrtrn(a,n,x,y)
+-double *a,*x,*y; int *n;
++void dlwrtrn(double *a, int *n, double *x, double *y)
+ /*	routine to solve ax=y with cholesky 
+ 	a - nxn matrix
+ 	x,y -vectors
+@@ -36,7 +35,7 @@
+ }
+ 
+ static double *pa1,*pa2,*pa3,*pa4,*pa5,*pc;
+-void dreflpc(c,a,n) double *c,*a; int *n;{
++void dreflpc(double *c, double *a, int *n) {
+ double ta1;
+ /*	convert ref to lpc
+ 	c - ref
+@@ -62,9 +61,7 @@
+ }
+ 
+ double *pa_1,*pa_2,*pa_3,*pa_4,*pa_5,*pal,*pt;
+-int dchlsky(a,n,t,det)
+-double *a,*t,*det;
+-int *n;
++int dchlsky(double *a, int *n, double *t, double *det)
+ /*	performs cholesky decomposition
+ 	a - l * l(transpose)
+ 	l - lower triangle
+@@ -76,7 +73,6 @@
+ 					*/
+ {
+ 	double sm;
+-	double sqrt();
+ 	int m;
+ 	*det = 1.;
+ 	m = 0;
+@@ -107,9 +103,7 @@
+ 
+ 
+ static double *pp,*ppl,*pa;
+-int dcovlpc(p,s,a,n,c)
+-double *p,*s,*a,*c;
+-int *n;
++int dcovlpc(double *p, double *s, double *a, int *n, double *c)
+ /*	solve p*a=s using stabilized covariance method
+ 	p - cov nxn matrix
+ 	s - corrvec
+@@ -118,7 +112,7 @@
+ 				*/
+ {
+ 	double ee;
+-	double sqrt(),ps,ps1,thres,d;
++	double ps,ps1,thres,d;
+ 	int m,n1;
+ 	m = dchlsky(p,n,c,&d);
+ 	dlwrtrn(p,n,c,s);
+@@ -153,8 +147,7 @@
+ 
+ /* cov mat for wtd lpc	*/
+ static double *pdl1,*pdl2,*pdl3,*pdl4,*pdl5,*pdl6,*pdll;
+-void dcwmtrx(s,ni,nl,np,phi,shi,ps,w)
+-double *s,*phi,*shi,*ps,*w; int *ni,*nl,*np;
++void dcwmtrx(double *s, int *ni, int *nl, int *np, double *phi, double *shi, double *ps, double *w)
+ {
+ 	double sm;
+ 	int i,j;
+@@ -183,9 +176,7 @@
+ }
+ 
+ double *psl,*pp2,*ppl2,*pc2,*pcl,*pph1,*pph2,*pph3,*pphl;
+-int dlpcwtd(s,ls,p,np,c,phi,shi,xl,w)
+-double *s,*p,*c,*phi,*shi,*xl,*w;
+-int *ls,*np;
++int dlpcwtd(double *s, int *ls, double *p, int *np, double *c, double *phi, double *shi, double *xl, double *w)
+ /*	pred anal subroutine with ridge reg
+ 	s - speech
+ 	ls - length of s
+@@ -284,7 +275,7 @@
+ #endif
+ 
+ 
+-void lgsol(p, r, k, ex)
++void lgsol(register int p, register double *r, register double *k, register double *ex)
+ /*  p	=	The order of the LPC analysis.
+  *  r	=	The array of p+1 autocorrelation coefficients.
+  *  k	=	The array of PARCOR coefficients returned by lgsol.
+@@ -293,10 +284,6 @@
+  * All coefficients are returned in "normal" signed format,
+  *	i.e. a[0] is assumed to be = 1.
+  */
+-
+-register int p;
+-register double *r, *k, *ex;
+-
+ {
+ register int m, h;
+ double rl[MAXORDER+1], ep[MAXORDER], en[MAXORDER];
+@@ -345,10 +332,7 @@
+ }
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void rwindow(din, dout, n, preemp)
+-     register short *din;
+-     register double *dout, preemp;
+-     register int n;
++void rwindow(register short *din, register double *dout, register int n, register double preemp)
+ {
+   register short *p;
+  
+@@ -365,10 +349,7 @@
+ 
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void cwindow(din, dout, n, preemp)
+-     register short *din;
+-     register double *dout, preemp;
+-     register int n;
++void cwindow(register short *din, register double *dout, register int n, register double preemp)
+ {
+   register int i;
+   register short *p;
+@@ -400,10 +381,7 @@
+ 
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void hwindow(din, dout, n, preemp)
+-     register short *din;
+-     register double *dout, preemp;
+-     register int n;
++void hwindow(register short *din, register double *dout, register int n, register double preemp)
+ {
+   register int i;
+   register short *p;
+@@ -433,10 +411,7 @@
+ 
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void hnwindow(din, dout, n, preemp)
+-     register short *din;
+-     register double *dout, preemp;
+-     register int n;
++void hnwindow(register short *din, register double *dout, register int n, register double preemp)
+ {
+   register int i;
+   register short *p;
+@@ -465,10 +440,7 @@
+ }
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-int get_window(dout, n, type)
+-     register double *dout;
+-     register int n;
+-     register int type;
++int get_window(register double *dout, register int n, register int type)
+ {
+   static short *din = NULL;
+   static int n0 = 0;
+@@ -507,10 +479,7 @@
+ }
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-int get_float_window(fout, n, type)
+-     register float *fout;
+-     register int n;
+-     register int type;
++int get_float_window(register float *fout, register int n, register int type)
+ {
+   static int n0 = 0;
+   static double *dout = NULL;
+@@ -535,11 +504,7 @@
+ }
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-int fwindow(din, dout, n, preemp, type)
+-     register short *din;
+-     register float *dout, preemp;
+-     register int n;
+-     register int type;
++int fwindow(register short *din, register float *dout, register int n, register float preemp, register int type)
+ {
+   static float *fwind=NULL;
+   static int size=0, otype= (-100);
+@@ -575,11 +540,7 @@
+   
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* same as fwindow() but input is float */
+-int fwindow_f(din, dout, n, preemp, type)
+-     register float *din;
+-     register float *dout, preemp;
+-     register int n;
+-     register int type;
++int fwindow_f(register float *din, register float *dout, register int n, register float preemp, register int type)
+ {
+   static float *fwind=NULL;
+   static int size=0, otype= (-100);
+@@ -615,11 +576,7 @@
+   
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+ /* same as fwindow() but I/O is double */
+-int fwindow_d(din, dout, n, preemp, type)
+-     register double *din;
+-     register double *dout, preemp;
+-     register int n;
+-     register int type;
++int fwindow_d(register double *din, register double *dout, register int n, register double preemp, register int type)
+ {
+   static float *fwind=NULL;
+   static int size=0, otype= (-100);
+@@ -656,11 +613,7 @@
+ 
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void w_window(din, dout, n, preemp, type)
+-     register short *din;
+-     register double *dout, preemp;
+-     register int n;
+-     register int type;
++void w_window(register short *din, register double *dout, register int n, register double preemp, register int type)
+ {
+   switch(type) {
+   case 0:
+@@ -681,9 +634,7 @@
+ }
+ 
+ /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+-void autoc( windowsize, s, p, r, e )
+-register int windowsize, p;
+-register double *s, *r, *e;
++void autoc(register int windowsize, register double *s, register int p, register double *r, register double *e)
+ /*
+  * Compute the pp+1 autocorrelation lags of the windowsize samples in s.
+  * Return the normalized autocorrelation coefficients in r.
+@@ -716,9 +667,7 @@
+ }
+ 
+ 
+-void k_to_a ( k, a, p )
+-register int p;
+-register double *k, *a;
++void k_to_a(register double *k, register double *a, register int p)
+ /*
+  * Convert the p PARCOR parameters in k to LPC (AR) coefficients in a.
+  */
+@@ -738,9 +687,7 @@
+     }
+ }
+    
+-void durbin ( r, k, a, p, ex)
+-register int p;
+-register double *r, *k, *a, *ex;
++void durbin(register double *r, register double *k, register double *a, register int p, register double *ex)
+ /*
+ * Compute the AR and PARCOR coefficients using Durbin's recursion. 
+ * Note: Durbin returns the coefficients in normal sign format.
+@@ -773,9 +720,7 @@
+     *ex = e;
+ }
+ 
+-void a_to_aca ( a, b, c, p )
+-double *a, *b, *c;
+-register int p;
++void a_to_aca (double *a, double *b, double *c, register int p)
+ /*  Compute the autocorrelations of the p LP coefficients in a. 
+  *  (a[0] is assumed to be = 1 and not explicitely accessed.)
+  *  The magnitude of a is returned in c.
+@@ -799,9 +744,7 @@
+ 
+ }
+ 
+-double itakura ( p, b, c, r, gain )
+-register double *b, *c, *r, *gain;
+-register int p;
++double itakura(register int p, register double *b, register double *c, register double *r, register double *gain)
+ /* Compute the Itakura LPC distance between the model represented
+  * by the signal autocorrelation (r) and its residual (gain) and
+  * the model represented by an LPC autocorrelation (c, b).
+@@ -818,10 +761,8 @@
+     return (s/ *gain);
+ }
+ 
+-int lpc(lpc_ord,lpc_stabl,wsize,data,lpca,ar,lpck,normerr,rms,preemp,type)
+-     int lpc_ord, wsize, type;
+-     double lpc_stabl, *lpca, *ar, *lpck, *normerr, *rms, preemp;
+-     short *data;
++int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data, double *lpca,
++        double *ar, double *lpck, double *normerr, double *rms, double preemp, int type)
+ {
+   static double *dwind=NULL;
+   static int nwind=0;
+@@ -885,7 +826,7 @@
+ }
+ 
+ /* convert reflection (PARCOR) coefficients to areas */
+-void dreflar(c,a,n) double *c,*a; int n;{
++void dreflar(double *c, double *a, int n) {
+ /*	refl to area			*/
+ 	register double *pa,*pa1,*pc,*pcl;
+ 	pa = a + 1;	pa1 = a;
+@@ -897,11 +838,7 @@
+ /* covariance LPC analysis; originally from Markel and Gray */
+ /* (a translation from the fortran) */
+ 
+-int w_covar(xx,m,n,istrt,y,alpha,r0,preemp,w_type)
+-     double *y, *alpha, *r0, preemp;
+-     short *xx;
+-     int *m,n,istrt;
+-     int w_type;
++int w_covar(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp, int w_type)
+ {
+   static double *x=NULL;
+   static int nold = 0;
+@@ -1023,10 +960,7 @@
+ }
+ 
+ /* Same as above, but returns alpha as a function of order. */
+-int covar2(xx,m,n,istrt,y,alpha,r0,preemp)
+-     double *y, *alpha, *r0, preemp;
+-     short *xx;
+-     int *m,n,istrt;
++int covar2(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp)
+ {
+   static double *x=NULL;
+   static int nold = 0;
+@@ -1128,20 +1062,20 @@
+  return(TRUE);
+ }
+ 
+-int lbpoly(); 
++int lbpoly(double *a, int order, double *rootr, double *rooti);
+ 	 
+ /*      ----------------------------------------------------------      */
+ /* Find the roots of the LPC denominator polynomial and convert the z-plane
+ 	zeros to equivalent resonant frequencies and bandwidths.	*/
+ /* The complex poles are then ordered by frequency.  */
+-int formant(lpc_order,s_freq,lpca,n_form,freq,band,init)
+-int	lpc_order, /* order of the LP model */
+-	*n_form,   /* number of COMPLEX roots of the LPC polynomial */
+-	init; 	   /* preset to true if no root candidates are available */
+-double	s_freq,    /* the sampling frequency of the speech waveform data */
+-	*lpca, 	   /* linear predictor coefficients */
+-	*freq,     /* returned array of candidate formant frequencies */
+-	*band;     /* returned array of candidate formant bandwidths */
++int formant(int lpc_order, double s_freq, double *lpca, int *n_form, double *freq, double *band, int init)
++/* 	lpc_order:  order of the LP model */
++/*	*n_form:    number of COMPLEX roots of the LPC polynomial */
++/*	init: 	    preset to true if no root candidates are available */
++/*	s_freq:     the sampling frequency of the speech waveform data */
++/*	*lpca: 	    linear predictor coefficients */
++/*	*freq:      returned array of candidate formant frequencies */
++/*	*band:      returned array of candidate formant bandwidths */
+ {
+   double  x, flo, pi2t, theta;
+   static double  rr[MAXORDER], ri[MAXORDER];
+@@ -1208,10 +1142,8 @@
+ 
+ 
+ /*-----------------------------------------------------------------------*/
+-int log_mag(x,y,z,n)
++int log_mag(double *x, double *y, double *z, int n)
+ 			/* z <- (10 * log10(x^2 + y^2))  for n elements */
+-double	*x, *y, *z;
+-int	n;
+ {
+ register double	*xp, *yp, *zp, t1, t2, ssq;
+ 
+@@ -1229,10 +1161,8 @@
+ }
+ 
+ /*-----------------------------------------------------------------------*/
+-int flog_mag(x,y,z,n)
++int flog_mag(float *x, float *y, float *z, int n)
+ 			/* z <- (10 * log10(x^2 + y^2))  for n elements */
+-float	*x, *y, *z;
+-int	n;
+ {
+ register float	*xp, *yp, *zp, t1, t2, ssq;
+ 
+@@ -1252,9 +1182,7 @@
+ #ifdef USE_OLD_FFT
+ #include	"thetable.c"	/*  table of sines and cosines */
+ /*-----------------------------------------------------------------------*/
+-fft ( l, x, y )
+-int l;
+-double *x, *y;
++fft(int l, double *x, double *y)
+ /* Compute the discrete Fourier transform of the 2**l complex sequence
+  * in x (real) and y (imaginary).  The DFT is computed in place and the
+  * Fourier coefficients are returned in x and y.
+@@ -1317,9 +1245,7 @@
+ }
+ 
+ /*-----------------------------------------------------------------------*/
+-ifft ( l, x, y )
+-int l;
+-double *x, *y;
++ifft(int l, double *x, double *y)
+ /* Compute the discrete inverse Fourier transform of the 2**l complex sequence
+  * in x (real) and y (imaginary).  The DFT is computed in place and the
+  * Fourier coefficients are returned in x and y.
+@@ -1383,9 +1309,7 @@
+ 
+ #include	"theftable.c"	/*  floating table of sines and cosines */
+ /*-----------------------------------------------------------------------*/
+-ffft ( l, x, y )
+-int l;
+-float *x, *y;
++ffft(int l, float *x, float *y)
+ /* Compute the discrete Fourier transform of the 2**l complex sequence
+  * in x (real) and y (imaginary).  The DFT is computed in place and the
+  * Fourier coefficients are returned in x and y.
+@@ -1448,9 +1372,7 @@
+ }
+ 
+ /*-----------------------------------------------------------------------*/
+-fifft ( l, x, y )
+-int l;
+-float *x, *y;
++fifft(int l, float *x, float *y)
+ /* Compute the discrete inverse Fourier transform of the 2**l complex sequence
+  * in x (real) and y (imaginary).  The DFT is computed in place and the
+  * Fourier coefficients are returned in x and y.
+@@ -1515,9 +1437,7 @@
+ 
+ /*********************************************************************/
+ /* Simple-minded real DFT (slooooowww) */
+-void dft(n,x,re,im)
+-     register int n;
+-     double *x, *re, *im;
++void dft(register int n, double *x, double *re, double *im)
+ {
+   register int m = n/2, i, j;
+   register double arg, sr, si, a, *rp;
+@@ -1544,11 +1464,10 @@
+ #define MAX_TRYS	100	/* Max number of times to try new starts */
+ #define MAX_ERR		1.e-6	/* Max acceptable error in quad factor */
+ 
+-int qquad(a,b,c,r1r,r1i,r2r,r2i) /* find x, where a*x**2 + b*x + c = 0 	*/
+-double	a, b, c;
+-double *r1r, *r2r, *r1i, *r2i; /* return real and imag. parts of roots */
++int qquad(double a,double b,double c, double *r1r, double *r1i, double *r2r, double *r2i) /* find x, where a*x**2 + b*x + c = 0 	*/
++/* return real and imag. parts of roots */
+ {
+-double  sqrt(), numi;
++double  numi;
+ double  den, y;
+ 
+ 	if(a == 0.0){
+@@ -1593,10 +1512,10 @@
+ 	}
+ }
+ 
+-int lbpoly(a, order, rootr, rooti) /* return FALSE on error */
+-    double  *a;		    /* coeffs. of the polynomial (increasing order) */
+-    int	    order;	    /* the order of the polynomial */
+-    double  *rootr, *rooti; /* the real and imag. roots of the polynomial */
++int lbpoly(double *a, int order, double *rootr, double *rooti) /* return FALSE on error */
++    /* *a:	       coeffs. of the polynomial (increasing order) */
++    /* order:	       the order of the polynomial */
++    /* *rootr, *rooti: the real and imag. roots of the polynomial */
+     /* Rootr and rooti are assumed to contain starting points for the root
+        search on entry to lbpoly(). */
+ {
+--- a/generic/snack.h
++++ b/generic/snack.h
+@@ -27,7 +27,7 @@
+ #endif
+ 
+ #ifndef CONST84
+-#   define CONST84
++#   define CONST84 const
+ #endif
+ 
+ #include "jkSound.h"

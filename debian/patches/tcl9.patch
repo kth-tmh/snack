@@ -1,0 +1,1207 @@
+From: Sergei Golovan:
+Subject: Patch ports Snack to Tcl/Tk 9. The main changes are:
+ - Define CONST, CONST84, CONST86 as const
+ - Define Tk_Offset as offsetof
+ - Define _ANSI_ARGS_
+ - Replace int by Tcl_Size where function prototype has changed,
+   definr Tcl_Size for 8.6
+ - Remove usage of obsolete TCL_INTERP_DESTROYED, TCL_PARSE_PART1, TK_CONFIG_OPTION_SPECIFIED
+ - Rewrite creation and configureation of new canvas items using Tcl_Obj interface
+ - Adapt calls to Tcl_InitStubs() and Tk_InitStubs()
+Date: Fri, 16 May 2025 14:29:29 +0300
+
+--- a/generic/snack.h
++++ b/generic/snack.h
+@@ -30,6 +30,24 @@
+ #   define CONST84 const
+ #endif
+ 
++#ifndef CONST86
++#   define CONST86 const
++#endif
++
++#ifndef CONST
++#   define CONST const
++#endif
++
++#define _ANSI_ARGS_(x) x
++
++#ifndef Tk_Offset
++#   define Tk_Offset(x,y) offsetof(x,y)
++#endif
++
++#ifndef TCL_SIZE_MAX
++#   define Tcl_Size int
++#endif
++
+ #include "jkSound.h"
+ #include "jkAudIO.h"
+ 
+--- a/generic/sound.c
++++ b/generic/sound.c
+@@ -65,7 +65,7 @@
+ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
+ 	       Tcl_Obj *CONST objv[])
+ {
+-  int len;
++  Tcl_Size len;
+   char *str;
+   CONST84 char *patchLevelStr;
+ 
+@@ -149,7 +149,7 @@
+   char rates[100];
+   
+ #ifdef USE_TCL_STUBS
+-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
++  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+     return TCL_ERROR;
+   }
+ #endif
+--- a/generic/jkSound.c
++++ b/generic/jkSound.c
+@@ -498,7 +498,8 @@
+ int
+ GetChannels(Tcl_Interp *interp, Tcl_Obj *obj, int *nchannels)
+ {
+-  int length, val;
++  Tcl_Size length;
++  int val;
+   char *str = Tcl_GetStringFromObj(obj, &length);
+ 
+   if (strncasecmp(str, "MONO", length) == 0) {
+@@ -525,7 +526,7 @@
+ int
+ GetEncoding(Tcl_Interp *interp, Tcl_Obj *obj, int *encoding, int *sampsize)
+ {
+-  int length;
++  Tcl_Size length;
+   char *str = Tcl_GetStringFromObj(obj, &length);
+ 
+   if (strncasecmp(str, "LIN16", length) == 0) {
+@@ -1088,7 +1089,7 @@
+ 	}
+       case BYTEORDER:
+ 	{
+-	  int length;
++	  Tcl_Size length;
+ 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 	  if (strncasecmp(str, "littleEndian", length) == 0) {
+ 	    SwapIfBE(s);
+@@ -1127,7 +1128,7 @@
+ 	}
+       case PRECISION:
+ 	{
+-	  int length;
++	  Tcl_Size length;
+ 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 	  if (strncasecmp(str, "double", length) == 0) {
+ 	    s->precision = SNACK_DOUBLE_PREC;
+@@ -1681,7 +1682,7 @@
+   char *name;
+   Tcl_HashTable *hTab = (Tcl_HashTable *) cdata;
+   Tcl_HashEntry *hPtr;
+-  int length = 0;
++  Tcl_Size length = 0;
+   char *string = NULL;
+   Tcl_Obj *cmdPtr = NULL;
+   Tcl_Obj *progPtr = NULL;
+@@ -2113,7 +2114,7 @@
+ int
+ SetFcname(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
+ {
+-  int length;
++  Tcl_Size length;
+   char *str = Tcl_GetStringFromObj(obj, &length);
+ 
+   if (s->fcname != NULL) {
+--- a/generic/jkSoundEngine.c
++++ b/generic/jkSoundEngine.c
+@@ -976,7 +976,8 @@
+   s->devStr = defaultOutDevice;
+ 
+   for (arg = 2; arg < objc; arg+=2) {
+-    int index, length;
++    int index;
++    Tcl_Size length;
+     char *str;
+     
+     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings,
+@@ -1366,7 +1367,8 @@
+   s->tmpbuf = NULL;
+       
+   for (arg = 2; arg < objc; arg+=2) {
+-    int index, length;
++    int index;
++    Tcl_Size length;
+     char *str;
+     
+     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings, "option",
+@@ -1704,7 +1706,8 @@
+ current_positionCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+ {
+   int n = -1;
+-  int arg, len, type = 0;
++  int arg, type = 0;
++  Tcl_Size len;
+   jkQueuedSound *p;
+ 
+   if (soundQueue != NULL) {
+--- a/generic/jkSoundEdit.c
++++ b/generic/jkSoundEdit.c
+@@ -281,7 +281,8 @@
+ int
+ lengthCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+ {
+-  int arg, len, type = 0, newlen = -1, i;
++  int arg, type = 0, newlen = -1, i;
++  Tcl_Size len;
+   char *string = NULL;
+ 
+   if (s->debug > 0) { Snack_WriteLog("Enter lengthCmd\n"); }
+@@ -728,7 +729,8 @@
+ appendCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+ {
+   Sound *t, *dummy;
+-  int arg, startpos = 0, endpos = -1, length = 0;
++  int arg, startpos = 0, endpos = -1;
++  Tcl_Size length = 0;
+   char *filetype, *str;
+   static CONST84 char *subOptionStrings[] = {
+     "-rate", "-frequency", "-skiphead", "-byteorder", "-channels",
+@@ -793,7 +795,7 @@
+       }
+     case BYTEORDER:
+       {
+-	int length;
++	Tcl_Size length;
+ 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 	    
+ 	if (strncasecmp(str, "littleEndian", length) == 0) {
+@@ -1528,7 +1530,7 @@
+     }
+     for (n = 3; n < 3 + s->nchannels; n++, i++) {
+       char *str;
+-      int len;
++      Tcl_Size len;
+ 
+       if (n >= objc) break;
+       str = Tcl_GetStringFromObj(objv[n], &len);
+--- a/generic/jkSoundFile.c
++++ b/generic/jkSoundFile.c
+@@ -523,7 +523,7 @@
+ 	tot = 0;
+       }
+     } else {
+-      int length = 0;
++      Tcl_Size length = 0;
+       unsigned char *ptr = NULL;
+       if (useOldObjAPI) {
+ 	ptr = (unsigned char *) obj->bytes;
+@@ -1322,7 +1322,7 @@
+       s->length = (obj->length  - s->skipBytes) / (s->sampsize * s->nchannels);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       s->length = (length - s->skipBytes) / (s->sampsize * s->nchannels);
+@@ -1400,7 +1400,7 @@
+       s->length = (obj->length - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       s->length = (length - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
+@@ -1548,7 +1548,7 @@
+       s->length = obj->length / s->sampsize + s->loadOffset;
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       s->length = length / s->sampsize + s->loadOffset;
+@@ -1695,7 +1695,7 @@
+       nsamp = (obj->length - hlen) / (s->sampsize * s->nchannels);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       nsamp = (length - hlen) / (s->sampsize * s->nchannels);
+@@ -1923,7 +1923,7 @@
+       nsampfile = (obj->length - s->headSize) / (s->sampsize * s->nchannels);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       nsampfile = (length - s->headSize) / (s->sampsize * s->nchannels);
+@@ -2338,7 +2338,7 @@
+       nsampfile = (obj->length - s->headSize) / (s->sampsize * s->nchannels);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       Tcl_GetByteArrayFromObj(obj, &length);
+       nsampfile = (length - s->headSize) / (s->sampsize * s->nchannels);
+@@ -2646,7 +2646,7 @@
+       }
+     case BYTEORDER:
+       {
+-	int length;
++	Tcl_Size length;
+ 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 
+ 	if (strncasecmp(str, "littleEndian", length) == 0) {
+@@ -2842,7 +2842,7 @@
+       }
+     case BYTEORDER:
+       {
+-	int length;
++	Tcl_Size length;
+ 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 
+ 	if (strncasecmp(str, "littleEndian", length) == 0) {
+@@ -2912,7 +2912,8 @@
+   if ((objc % 2) == 0) { /* sound -> variable */
+     Tcl_Obj *new = Tcl_NewObj();
+     char *filetype = s->fileType;
+-    int arg, len, startpos = 0, endpos = s->length;
++    int arg, startpos = 0, endpos = s->length;
++    Tcl_Size len;
+     static CONST84 char *subOptionStrings[] = {
+       "-fileformat", "-start", "-end", "-byteorder",
+       NULL
+@@ -3037,7 +3038,7 @@
+ 	}
+       case BYTEORDER:
+ 	{
+-	  int length;
++	  Tcl_Size length;
+ 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 	      
+ 	  if (strncasecmp(str, "littleEndian", length) == 0) {
+@@ -3160,7 +3161,7 @@
+       memcpy((char *)s->tmpbuf, obj->bytes, len);
+     } else {
+ #ifdef TCL_81_API
+-      int length = 0;
++      Tcl_Size length = 0;
+       
+       ptr = Tcl_GetByteArrayFromObj(obj, &length);
+       len = min(length, buflen);
+@@ -3221,7 +3222,7 @@
+ int
+ GetFileFormat(Tcl_Interp *interp, Tcl_Obj *obj, char **filetype)
+ {
+-  int length;
++  Tcl_Size length;
+   char *str = Tcl_GetStringFromObj(obj, &length);
+   Snack_FileFormat *ff;
+ 
+--- a/unix/jkAudIO_oss.c
++++ b/unix/jkAudIO_oss.c
+@@ -20,8 +20,7 @@
+  */
+ 
+ #include "tcl.h"
+-#include "jkAudIO.h"
+-#include "jkSound.h"
++#include "snack.h"
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+@@ -707,7 +706,7 @@
+   ioctl(mfd, SOUND_MIXER_READ_RECSRC, &recSrc);
+ /*printf("JackVarProc %x %s %s\n", recSrc, name1, name2);*/
+   if (flags & TCL_TRACE_UNSETS) {
+-    if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
++    if ((flags & TCL_TRACE_DESTROYED)) {
+       for (i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
+ 	if (strncasecmp(mixLink->jack, jackLabels[i], strlen(mixLink->jack))
+ 	    == 0) {
+@@ -721,7 +720,7 @@
+       }
+       obj = Tcl_NewIntObj(status);
+       var = Tcl_NewStringObj(mixLink->jackVar, -1);
+-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
++      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
+       Tcl_TraceVar(interp, mixLink->jackVar,
+ 		   TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+ 		   JackVarProc, mixLink);
+@@ -746,7 +745,7 @@
+       }
+       obj = Tcl_NewIntObj(status);
+       var = Tcl_NewStringObj(mixerLinks[i][0].jackVar, -1);
+-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY |TCL_PARSE_PART1);
++      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
+     }
+   }
+   dontTrace = 0;
+@@ -778,7 +777,7 @@
+       } else {
+ 	Tcl_Obj *obj = Tcl_NewIntObj(status);
+ 	Tcl_ObjSetVar2(interp, var, NULL, obj, 
+-		       TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
++		       TCL_GLOBAL_ONLY);
+ 
+       }
+       Tcl_TraceVar(interp, mixerLinks[i][0].jackVar,
+@@ -878,14 +877,14 @@
+   CONST84 char *stringValue;
+   
+   if (flags & TCL_TRACE_UNSETS) {
+-    if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
++    if ((flags & TCL_TRACE_DESTROYED)) {
+       Tcl_Obj *obj, *var;
+       char tmp[VOLBUFSIZE];
+ 
+       SnackMixerGetVolume(mixLink->mixer, mixLink->channel, tmp, VOLBUFSIZE);
+       obj = Tcl_NewIntObj(atoi(tmp));
+       var = Tcl_NewStringObj(mixLink->mixerVar, -1);
+-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
++      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
+       Tcl_TraceVar(interp, mixLink->mixerVar,
+ 		   TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+ 		   VolumeVarProc, mixLink);
+@@ -929,7 +928,7 @@
+ 	  SnackMixerGetVolume(line, channel, tmp, VOLBUFSIZE);
+ 	  obj = Tcl_NewIntObj(atoi(tmp));
+ 	  Tcl_ObjSetVar2(interp, objv[j+3], NULL, obj, 
+-			 TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
++			 TCL_GLOBAL_ONLY);
+ 	}
+ 	Tcl_TraceVar(interp, mixerLinks[i][j].mixerVar,
+ 		     TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
+@@ -954,7 +953,7 @@
+ 			    tmp, VOLBUFSIZE);
+ 	obj = Tcl_NewIntObj(atoi(tmp));
+ 	var = Tcl_NewStringObj(mixerLinks[i][j].mixerVar, -1);
+-	Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY|TCL_PARSE_PART1);
++	Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
+       }
+     }
+     if (mixerLinks[i][0].jackVar != NULL) {
+@@ -965,7 +964,7 @@
+       }
+       obj = Tcl_NewIntObj(status);
+       var = Tcl_NewStringObj(mixerLinks[i][0].jackVar, -1);
+-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
++      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
+     }
+   }
+ }
+--- a/generic/jkSoundProc.c
++++ b/generic/jkSoundProc.c
+@@ -284,7 +284,7 @@
+       }
+     case ANATYPE:
+       {
+-	int len;
++	Tcl_Size len;
+  	char *str = Tcl_GetStringFromObj(objv[arg+1], &len);
+ 	
+ 	if (strncasecmp(str, "lpc", len) == 0) {
+@@ -732,7 +732,7 @@
+       }
+     case ANATYPE:
+       {
+-	int len;
++	Tcl_Size len;
+  	char *str = Tcl_GetStringFromObj(objv[arg+1], &len);
+ 	
+ 	if (strncasecmp(str, "lpc", len) == 0) {
+@@ -1869,7 +1869,7 @@
+   float a1[32],a2[32],mn[32];
+   int i,j,noli,nofpts=512,shobeg=2,nosing;
+   int start;
+-  int plLen = 0;
++  Tcl_Size plLen = 0;
+   Tcl_Obj** plElems;
+   Tcl_Obj *list, *listInv, *listFlow;
+ 
+--- a/generic/jkMixer.c
++++ b/generic/jkMixer.c
+@@ -25,8 +25,7 @@
+ #include <math.h>
+ #include <string.h>
+ #include "tcl.h"
+-#include "jkAudIO.h"
+-#include "jkSound.h"
++#include "snack.h"
+ 
+ extern int rop, wop;
+ 
+--- a/generic/shape.c
++++ b/generic/shape.c
+@@ -194,7 +194,7 @@
+         }
+       case SHAPE:
+         {
+-          int nchar = 0;
++          Tcl_Size nchar = 0;
+           char *str = Tcl_GetStringFromObj(objv[arg+1], &nchar);
+           if (nchar > 0 && (preshp = Snack_GetSound(interp, str)) == NULL) {
+             return TCL_ERROR;
+@@ -203,7 +203,7 @@
+         }
+       case BYTEORDER:
+         {
+-          int length;
++          Tcl_Size length;
+           char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+           
+           if (strncasecmp(str, "littleEndian", length) == 0) {
+@@ -417,7 +417,7 @@
+       }
+     case BYTEORDER:
+       {
+-        int length;
++        Tcl_Size length;
+         char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
+ 
+         if (strncasecmp(str, "littleEndian", length) == 0) {
+--- a/generic/jkFilter.c
++++ b/generic/jkFilter.c
+@@ -208,7 +208,7 @@
+ 	     Tcl_Obj *CONST objv[])
+ {
+   Snack_Filter f = (Snack_Filter) clientData;
+-  int length = 0;
++  Tcl_Size length = 0;
+   char *string = NULL;
+   Tcl_HashEntry *hPtr;
+   
+@@ -253,7 +253,7 @@
+   char *name;
+   Tcl_HashTable *hTab = (Tcl_HashTable *) cdata;
+   Tcl_HashEntry *hPtr;
+-  int length = 0;
++  Tcl_Size length = 0;
+   char *string = NULL;
+ 
+   if (objc < 2) {
+--- a/generic/jkFilterIIR.c
++++ b/generic/jkFilterIIR.c
+@@ -98,7 +98,7 @@
+ iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
+ 	       Tcl_Obj *CONST objv[])
+ {
+-  int j, n;
++  Tcl_Size j, n;
+   Tcl_Obj **impObj;
+   double dither, noise;
+   iirFilter_t iir = (iirFilter_t) f;
+--- a/generic/snack.c
++++ b/generic/snack.c
+@@ -137,7 +137,7 @@
+ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
+ 	       Tcl_Obj *CONST objv[])
+ {
+-  int len;
++  Tcl_Size len;
+   char *str;
+   CONST84 char *patchLevelStr;
+   
+@@ -233,7 +233,7 @@
+   char rates[100];
+   
+ #ifdef USE_TCL_STUBS
+-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
++  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+     return TCL_ERROR;
+   }
+ #endif
+@@ -258,7 +258,7 @@
+ 
+   if (Tcl_GetCommandInfo(interp, "button", &infoPtr) != 0) {
+ #ifdef USE_TK_STUBS
+-    if (Tk_InitStubs(interp, "8", 0) == NULL) {
++    if (Tk_InitStubs(interp, TK_VERSION, 0) == NULL) {
+       return TCL_ERROR;
+     }
+ #endif
+--- a/generic/jkCanvSpeg.c
++++ b/generic/jkCanvSpeg.c
+@@ -20,11 +20,10 @@
+  */
+ 
+ #include "tcl.h"
+-#include "snack.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+-#define USE_OLD_CANVAS /* To keep Tk8.3 happy */
+ #include "tk.h"
++#include "snack.h"
+ #include "jkCanvItems.h"
+ #include <string.h>
+ #include <math.h>
+@@ -90,10 +89,10 @@
+ 
+ static int ParseColorMap(ClientData clientData, Tcl_Interp *interp,
+ 			 Tk_Window tkwin, CONST84 char *value, char *recordPtr,
+-			 int offset);
++			 Tcl_Size offset);
+ 
+ static CONST86 char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
+-			   char *recordPtr, int offset,
++			   char *recordPtr, Tcl_Size offset,
+ 			   Tcl_FreeProc **freeProcPtr);
+ 
+ Tk_CustomOption spegTagsOption = { (Tk_OptionParseProc *) NULL,
+@@ -211,12 +210,12 @@
+ 				     SpectrogramItem *spegPtr);
+ 
+ static int    ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
+-				   Tk_Item *itemPtr, int argc,
+-				   char **argv, int flags);
++				   Tk_Item *itemPtr, Tcl_Size argc,
++				   Tcl_Obj * const argv[], int flags);
+ 
+ static int    CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
+-				struct Tk_Item *itemPtr,
+-				int argc, char **argv);
++				Tk_Item *itemPtr,
++				Tcl_Size argc, Tcl_Obj *const argv[]);
+ 
+ static void   DeleteSpectrogram(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 				Display *display);
+@@ -230,7 +229,7 @@
+ 			       double scaleX, double scaleY);
+ 
+ static int    SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas,
+-				Tk_Item *itemPtr, int argc, char **argv);
++				Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
+ 
+ static int    SpectrogramToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 				double *rectPtr);
+@@ -262,7 +261,7 @@
+   SpectrogramCoords,
+   DeleteSpectrogram,
+   DisplaySpectrogram,
+-  0,
++  TK_CONFIG_OBJS,
+   SpectrogramToPoint,
+   SpectrogramToArea,
+   SpectrogramToPS,
+@@ -278,7 +277,7 @@
+ 
+ static int
+ CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
+-		  int argc, char **argv)
++		  Tcl_Size argc, Tcl_Obj *const argv[])
+ {
+   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr; 
+   Tk_Window tkwin = Tk_CanvasTkwin(canvas);
+@@ -365,7 +364,9 @@
+   }
+ 
+   for (i = 1; i < argc; i++) {
+-      if ((argv[i][0] == '-') && (argv[i][1] >= 'a') && (argv[i][1] <= 'z')) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[i], &len);
++      if ((len >= 2) && (str[0] == '-') && (str[1] >= 'a') && (str[1] <= 'z')) {
+ 	  break;
+       }
+   }
+@@ -383,12 +384,11 @@
+ 
+ static int
+ SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
+-		  int argc, char **argv)
++		  Tcl_Size argc, Tcl_Obj *const argv[])
+ {
+ 
+   SpectrogramItem *wPtr = (SpectrogramItem *) itemPtr;
+   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+-  char **oargv = argv;
+   int result = TCL_OK;
+ 
+   if (argc == 0) {
+@@ -399,14 +399,14 @@
+   }
+   
+   if (argc == 1) {
+-      if (Tcl_SplitList(interp, argv[0], &argc, (CONST84 char ***) &argv) != TCL_OK) {
++      if (Tcl_ListObjGetElements(interp, argv[0], &argc, (Tcl_Obj ***) &argv) != TCL_OK) {
+ 	  return TCL_ERROR;
+       }
+   }
+ 
+   if (argc == 2) {
+-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
+-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
++    if ((Tk_CanvasGetCoordFromObj(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
++	(Tk_CanvasGetCoordFromObj(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+       result = TCL_ERROR;
+     } else {
+       ComputeSpectrogramBbox(canvas, wPtr);
+@@ -414,15 +414,11 @@
+   } else {
+     char buf[80];
+ 
+-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
++    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", (int)argc);
+     Tcl_SetResult(interp, buf, TCL_VOLATILE);
+ 
+     result = TCL_ERROR;
+   }
+-done:
+-  if (oargv != argv) {
+-      ckfree( (char*)argv);
+-  }
+   return result;
+ }
+ 
+@@ -588,7 +584,7 @@
+ 
+ static int
+ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
+-		     int argc, char **argv, int flags)
++		     Tcl_Size argc, Tcl_Obj *const argv[], int flags)
+ {
+   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr;
+   Sound *s = spegPtr->sound;
+@@ -601,15 +597,16 @@
+ 
+   /*  if (spegPtr->si.computing) return TCL_OK;*/
+ 
+-  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
+-			 (CONST84 char **)argv, 
+-			 (char *) spegPtr, flags) != TCL_OK) return TCL_ERROR;
++  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc, (void *)argv, 
++			 (char *) spegPtr, flags|TK_CONFIG_OBJS) != TCL_OK) return TCL_ERROR;
+ 
+   if (spegPtr->si.debug > 1) Snack_WriteLog("  Enter ConfigureSpeg\n");
+   
+   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
+     for (j = 0; j < argc; j += 2) {
+-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[j], &len);
++      if (strncmp(str, configSpecs[i].argvName, len) == 0) {
+ 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
+ 	break;
+       }
+@@ -618,26 +615,28 @@
+   
+ #if defined(MAC) || defined(MAC_OSX_TCL)
+   for (i = 0; i < argc; i++) {
+-    int l = strlen(argv[i]);
+-    if (l && strncmp(argv[i], "-anchor", l) == 0) {
++    Tcl_Size l;
++    char *str = Tcl_GetStringFromObj(argv[i], &l);
++    if (l && strncmp(str, "-anchor", l) == 0) {
+       i++;
+-      if (strcmp(argv[i], "ne") == 0) {
++      str = Tcl_GetStringFromObj(argv[i], &l);
++      if (strcmp(str, "ne") == 0) {
+ 	spegPtr->anchor = 1;
+-      } else if (strcmp(argv[i], "nw") == 0) {
++      } else if (strcmp(str, "nw") == 0) {
+ 	spegPtr->anchor = 7;
+-      } else if (strcmp(argv[i], "n") == 0) {
++      } else if (strcmp(str, "n") == 0) {
+ 	spegPtr->anchor = 0;
+-      } else if (strcmp(argv[i], "e") == 0) {
++      } else if (strcmp(str, "e") == 0) {
+ 	spegPtr->anchor = 2;
+-      } else if (strcmp(argv[i], "se") == 0) {
++      } else if (strcmp(str, "se") == 0) {
+ 	spegPtr->anchor = 3;
+-      } else if (strcmp(argv[i], "sw") == 0) {
++      } else if (strcmp(str, "sw") == 0) {
+ 	spegPtr->anchor = 5;
+-      } else if (strcmp(argv[i], "s") == 0) {
++      } else if (strcmp(str, "s") == 0) {
+ 	spegPtr->anchor = 4;
+-      } else if (strcmp(argv[i], "w") == 0) {
++      } else if (strcmp(str, "w") == 0) {
+ 	spegPtr->anchor = 6;
+-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
++      } else if (strncmp(str, "center", l) == 0) {
+ 	spegPtr->anchor = 8;
+       }
+       break;
+@@ -1729,10 +1728,11 @@
+ 
+ static int
+ ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
+-	      CONST84 char *value, char *recordPtr, int offset)
++	      CONST84 char *value, char *recordPtr, Tcl_Size offset)
+ {
+   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
+-  int argc, i;
++  int i;
++  Tcl_Size argc;
+   CONST84 char **argv = NULL;
+ 
+   if (Tcl_SplitList(interp, value, &argc, &argv) != TCL_OK) {
+@@ -1823,7 +1823,7 @@
+ 
+ static CONST86 char*
+ PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
+-	      int offset, Tcl_FreeProc **freeProcPtr)
++	      Tcl_Size offset, Tcl_FreeProc **freeProcPtr)
+ {
+   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
+   char *buffer;
+--- a/generic/jkCanvItems.h
++++ b/generic/jkCanvItems.h
+@@ -108,6 +108,10 @@
+   extern double hypot(double x, double y);
+ #endif
+ 
++#ifndef TK_CONFIG_OPTION_SPECIFIED
++#  define TK_CONFIG_OPTION_SPECIFIED      (1 << 4)
++#endif
++
+ #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)
+ 
+ #ifdef __cplusplus
+--- a/generic/jkCanvWave.c
++++ b/generic/jkCanvWave.c
+@@ -20,12 +20,11 @@
+  */
+ 
+ #include "tcl.h"
+-#include "snack.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+-#define USE_OLD_CANVAS /* To keep Tk8.3 happy */
+ #include "tk.h"
++#include "snack.h"
+ #include "jkCanvItems.h"
+ #include <string.h>
+ 
+@@ -191,12 +190,12 @@
+   static int    ComputeWaveCoords(Tk_Item *itemPtr);
+   
+   static int    ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, 
+-			      Tk_Item *itemPtr, int argc,
+-			      char **argv, int flags);
++			      Tk_Item *itemPtr, Tcl_Size argc,
++			      Tcl_Obj *const argv[], int flags);
+ 
+   static int    CreateWave(Tcl_Interp *interp, Tk_Canvas canvas,
+ 			   struct Tk_Item *itemPtr,
+-			   int argc, char **argv);
++			   Tcl_Size argc, Tcl_Obj *const argv[]);
+ 
+   static void   DeleteWave(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 			   Display *display);
+@@ -213,7 +212,7 @@
+ 			      double deltaX, double deltaY);
+   
+   static int    WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas,
+-			   Tk_Item *itemPtr, int argc, char **argv);
++			   Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
+   
+   static int    WaveToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 			   double *rectPtr);
+@@ -237,7 +236,7 @@
+   WaveCoords,
+   DeleteWave,
+   DisplayWave,
+-  0,
++  TK_CONFIG_OBJS,
+   WaveToPoint,
+   WaveToArea,
+   WaveToPS,
+@@ -253,7 +252,7 @@
+ 
+ static int
+ CreateWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
+-	   int argc, char **argv)
++	   Tcl_Size argc, Tcl_Obj *const argv[])
+ {
+   WaveItem *wavePtr = (WaveItem *) itemPtr;
+   int i;
+@@ -315,7 +314,9 @@
+   wavePtr->y = 0;
+ 
+   for (i = 1; i < argc; i++) {
+-      if ((argv[i][0] == '-') && (argv[i][1] >= 'a') && (argv[i][1] <= 'z')) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[i], &len);
++      if ((len >= 2) && (str[0] == '-') && (str[1] >= 'a') && (str[1] <= 'z')) {
+ 	  break;
+       }
+   }
+@@ -396,12 +397,11 @@
+ }
+ 
+ static int
+-WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
+-	   char **argv)
++WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, Tcl_Size argc,
++	   Tcl_Obj *const argv[])
+ {
+   WaveItem *wPtr = (WaveItem *) itemPtr;
+   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+-  char **oargv = argv;
+   int result = TCL_OK;
+ 
+   if (argc == 0) {
+@@ -412,14 +412,14 @@
+   }
+   
+   if (argc == 1) {
+-      if (Tcl_SplitList(interp, argv[0], &argc, (CONST84 char ***) &argv) != TCL_OK) {
++      if (Tcl_ListObjGetElements(interp, argv[0], &argc, (Tcl_Obj ***) &argv) != TCL_OK) {
+ 	  return TCL_ERROR;
+       }
+   }
+ 
+   if (argc == 2) {
+-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
+-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
++    if ((Tk_CanvasGetCoordFromObj(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
++	(Tk_CanvasGetCoordFromObj(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+       result = TCL_ERROR;
+     } else {
+       ComputeWaveBbox(canvas, wPtr);
+@@ -427,15 +427,11 @@
+   } else {
+     char buf[80];
+ 
+-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
++    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", (int)argc);
+     Tcl_SetResult(interp, buf, TCL_VOLATILE);
+ 
+     result = TCL_ERROR;
+   }
+-done:
+-  if (oargv != argv) {
+-      ckfree( (char*)argv);
+-  }
+   return result;
+ }
+ 
+@@ -910,7 +906,7 @@
+ 
+ static int
+ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
+-	      int argc, char **argv, int flags)
++	      Tcl_Size argc, Tcl_Obj *const argv[], int flags)
+ {
+   WaveItem *wavePtr = (WaveItem *) itemPtr;
+   Sound *s = wavePtr->sound;
+@@ -923,15 +919,16 @@
+ 
+   if (argc == 0) return TCL_OK;
+ 
+-  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
+-			 (CONST84 char **)argv,
+-			 (char *) wavePtr, flags) != TCL_OK) return TCL_ERROR;
++  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc, (void *)argv,
++			 (char *) wavePtr, flags|TK_CONFIG_OBJS) != TCL_OK) return TCL_ERROR;
+ 
+   if (wavePtr->debug > 1) Snack_WriteLog("  Enter ConfigureWave\n");
+ 
+   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
+     for (j = 0; j < argc; j += 2) {
+-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[j], &len);
++      if (strncmp(str, configSpecs[i].argvName, len) == 0) {
+ 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
+ 	break;
+       }
+@@ -940,25 +937,28 @@
+ 
+ #if defined(MAC)
+   for (i = 0; i < argc; i++) {
+-    if (strncmp(argv[i], "-anchor", strlen(argv[i])) == 0) {
++    Tcl_Size l;
++    char *str = Tcl_GetStringFromObj(argv[i], &l);
++    if (strncmp(str, "-anchor", l) == 0) {
+       i++;
+-      if (strcmp(argv[i], "ne") == 0) {
++      str = Tcl_GetStringFromObj(argv[i], &l);
++      if (strcmp(str, "ne") == 0) {
+ 	wavePtr->anchor = 1;
+-      } else if (strcmp(argv[i], "nw") == 0) {
++      } else if (strcmp(str, "nw") == 0) {
+ 	wavePtr->anchor = 7;
+-      } else if (strcmp(argv[i], "n") == 0) {
++      } else if (strcmp(str, "n") == 0) {
+ 	wavePtr->anchor = 0;
+-      } else if (strcmp(argv[i], "e") == 0) {
++      } else if (strcmp(str, "e") == 0) {
+ 	wavePtr->anchor = 2;
+-      } else if (strcmp(argv[i], "se") == 0) {
++      } else if (strcmp(str, "se") == 0) {
+ 	wavePtr->anchor = 3;
+-      } else if (strcmp(argv[i], "sw") == 0) {
++      } else if (strcmp(str, "sw") == 0) {
+ 	wavePtr->anchor = 5;
+-      } else if (strcmp(argv[i], "s") == 0) {
++      } else if (strcmp(str, "s") == 0) {
+ 	wavePtr->anchor = 4;
+-      } else if (strcmp(argv[i], "w") == 0) {
++      } else if (strcmp(str, "w") == 0) {
+ 	wavePtr->anchor = 6;
+-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
++      } else if (strncmp(str, "center", l) == 0) {
+ 	wavePtr->anchor = 8;
+       }
+       break;
+--- a/generic/jkCanvSect.c
++++ b/generic/jkCanvSect.c
+@@ -20,12 +20,11 @@
+  */
+ 
+ #include "tcl.h"
+-#include "snack.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+-#define USE_OLD_CANVAS /* To keep Tk8.3 happy */
+ #include "tk.h"
++#include "snack.h"
+ #include "jkCanvItems.h"
+ #include <string.h>
+ 
+@@ -188,11 +187,11 @@
+ static int    ComputeSectionCoords(Tk_Item *itemPtr);
+ 
+ static int    ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas,
+-			       Tk_Item *itemPtr, int argc,
+-			       char **argv, int flags);
++			       Tk_Item *itemPtr, Tcl_Size argc,
++			       Tcl_Obj *const argv[], int flags);
+ 
+ static int    CreateSection(Tcl_Interp *interp,	Tk_Canvas canvas,
+-			    struct Tk_Item *itemPtr, int argc, char **argv);
++			    struct Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
+ 
+ static void   DeleteSection(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 			    Display *display);
+@@ -206,7 +205,7 @@
+ 			   double scaleX, double scaleY);
+ 
+ static int    SectionCoords(Tcl_Interp *interp,	Tk_Canvas canvas,
+-			    Tk_Item *itemPtr, int argc, char **argv);
++			    Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
+ 
+ static int    SectionToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
+ 			    double *rectPtr);
+@@ -233,7 +232,7 @@
+   SectionCoords,
+   DeleteSection,
+   DisplaySection,
+-  0,
++  TK_CONFIG_OBJS,
+   SectionToPoint,
+   SectionToArea,
+   SectionToPS,
+@@ -249,7 +248,7 @@
+ 
+ static int
+ CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
+-	   int argc, char **argv)
++	   Tcl_Size argc, Tcl_Obj *const argv[])
+ {
+   SectionItem *sectPtr = (SectionItem *) itemPtr;
+   int i;
+@@ -328,7 +327,9 @@
+ 
+ 
+   for (i = 1; i < argc; i++) {
+-      if ((argv[i][0] == '-') && (argv[i][1] >= 'a') && (argv[i][1] <= 'z')) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[i], &len);
++      if ((len >= 2) && (str[0] == '-') && (str[1] >= 'a') && (str[1] <= 'z')) {
+ 	  break;
+       }
+   }
+@@ -345,11 +346,10 @@
+ 
+ static int
+ SectionCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
+-	      int argc, char **argv)
++	      Tcl_Size argc, Tcl_Obj *const argv[])
+ {
+   SectionItem *wPtr = (SectionItem *) itemPtr;
+   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+-  char **oargv = argv;
+   int result = TCL_OK;
+ 
+   if (argc == 0) {
+@@ -360,14 +360,14 @@
+   }
+   
+   if (argc == 1) {
+-      if (Tcl_SplitList(interp, argv[0], &argc, (CONST84 char ***) &argv) != TCL_OK) {
++      if (Tcl_ListObjGetElements(interp, argv[0], &argc, (Tcl_Obj ***) &argv) != TCL_OK) {
+ 	  return TCL_ERROR;
+       }
+   }
+ 
+   if (argc == 2) {
+-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
+-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
++    if ((Tk_CanvasGetCoordFromObj(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
++	(Tk_CanvasGetCoordFromObj(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+       result = TCL_ERROR;
+     } else {
+       ComputeSectionBbox(canvas, wPtr);
+@@ -375,15 +375,11 @@
+   } else {
+     char buf[80];
+ 
+-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
++    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", (int)argc);
+     Tcl_SetResult(interp, buf, TCL_VOLATILE);
+ 
+     result = TCL_ERROR;
+   }
+-done:
+-  if (oargv != argv) {
+-      ckfree( (char*)argv);
+-  }
+   return result;
+ }
+ 
+@@ -752,7 +748,7 @@
+ 
+ static int
+ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
+-	      int argc, char **argv, int flags)
++	      Tcl_Size argc, Tcl_Obj *const argv[], int flags)
+ {
+   SectionItem *sectPtr = (SectionItem *) itemPtr;
+   Sound *s = sectPtr->sound;
+@@ -765,15 +761,16 @@
+ 
+   if (argc == 0) return TCL_OK;
+ 
+-  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
+-			 (CONST84 char **)argv,
+-			 (char *) sectPtr, flags) != TCL_OK) return TCL_ERROR;
++  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc, (void *)argv,
++			 (char *) sectPtr, flags|TK_CONFIG_OBJS) != TCL_OK) return TCL_ERROR;
+ 
+   if (sectPtr->debug) Snack_WriteLog("Enter ConfigureSection\n");
+ 
+   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
+     for (j = 0; j < argc; j += 2) {
+-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
++      Tcl_Size len;
++      char *str = Tcl_GetStringFromObj(argv[j], &len);
++      if (strncmp(str, configSpecs[i].argvName, len) == 0) {
+ 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
+ 	break;
+       }
+@@ -782,25 +779,28 @@
+ 
+ #if defined(MAC) || defined(MAC_OSX_TCL)
+   for (i = 0; i < argc; i++) {
+-    if (strncmp(argv[i], "-anchor", strlen(argv[i])) == 0) {
++    Tcl_Size l;
++    char *str = Tcl_GetStringFromObj(argv[i], &l);
++    if (strncmp(str, "-anchor", strlen(l)) == 0) {
+       i++;
+-      if (strcmp(argv[i], "ne") == 0) {
++      str = Tcl_GetStringFromObj(argv[i], &l);
++      if (strcmp(str, "ne") == 0) {
+ 	sectPtr->anchor = 1;
+-      } else if (strcmp(argv[i], "nw") == 0) {
++      } else if (strcmp(str, "nw") == 0) {
+ 	sectPtr->anchor = 7;
+-      } else if (strcmp(argv[i], "n") == 0) {
++      } else if (strcmp(str, "n") == 0) {
+ 	sectPtr->anchor = 0;
+-      } else if (strcmp(argv[i], "e") == 0) {
++      } else if (strcmp(str, "e") == 0) {
+ 	sectPtr->anchor = 2;
+-      } else if (strcmp(argv[i], "se") == 0) {
++      } else if (strcmp(str, "se") == 0) {
+ 	sectPtr->anchor = 3;
+-      } else if (strcmp(argv[i], "sw") == 0) {
++      } else if (strcmp(str, "sw") == 0) {
+ 	sectPtr->anchor = 5;
+-      } else if (strcmp(argv[i], "s") == 0) {
++      } else if (strcmp(str, "s") == 0) {
+ 	sectPtr->anchor = 4;
+-      } else if (strcmp(argv[i], "w") == 0) {
++      } else if (strcmp(str, "w") == 0) {
+ 	sectPtr->anchor = 6;
+-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
++      } else if (strncmp(str, "center", l) == 0) {
+ 	sectPtr->anchor = 8;
+       }
+       break;
+--- a/generic/SnackOgg.c
++++ b/generic/SnackOgg.c
+@@ -2220,7 +2220,8 @@
+ PutOggHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
+ 	     int objc, Tcl_Obj *CONST objv[], int len)
+ {
+-  int arg, n = 0, ret;
++  int arg, ret;
++  Tcl_Size n = 0;
+   OggVorbis_File *of = (OggVorbis_File *)s->extHead2;
+   Tcl_Obj **listObj;
+   static char *subOptionStrings[] = {
+@@ -2535,7 +2536,7 @@
+       switch ((enum options) index) {
+       case COMMENT:
+ 	{
+-	  int i, n;
++	  Tcl_Size i, n;
+ 	  Tcl_Obj **listObj;
+ 	  
+ 	  if (Tcl_ListObjGetElements(interp, objv[arg+1], &n, &listObj) !=
+@@ -2606,7 +2607,7 @@
+   int res;
+   
+ #ifdef USE_TCL_STUBS
+-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
++  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+     return TCL_ERROR;
+   }
+ #endif
+--- a/unix/jkAudIO_alsa.c
++++ b/unix/jkAudIO_alsa.c
+@@ -20,8 +20,7 @@
+  */
+ 
+ #include "tcl.h"
+-#include "jkAudIO.h"
+-#include "jkSound.h"
++#include "snack.h"
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+--- a/generic/SnackMpg.c
++++ b/generic/SnackMpg.c
+@@ -784,7 +784,7 @@
+     int res;
+   
+ #ifdef USE_TCL_STUBS
+-    if (Tcl_InitStubs(interp, "8", 0) == NULL) {
++    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+         return TCL_ERROR;
+     }
+ #endif
+--- a/generic/SphereFile.c
++++ b/generic/SphereFile.c
+@@ -326,7 +326,7 @@
+   int res;
+   
+ #ifdef USE_TCL_STUBS
+-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
++  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
+     return TCL_ERROR;
+   }
+ #endif

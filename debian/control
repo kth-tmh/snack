@@ -1,0 +1,109 @@
+Source: snack
+Section: sound
+Priority: optional
+Maintainer: Sergei Golovan <sgolovan@debian.org>
+Build-Depends: debhelper-compat (= 13), dh-exec, tk8.6-dev, tk9.0-dev,
+ libmpg123-dev, libogg-dev, libvorbis-dev, libasound2-dev [linux-any]
+Build-Depends-Indep: python3-all-dev, python3-setuptools, dh-python
+Standards-Version: 4.7.2
+Homepage: http://pdqi.com/w/pw/pdqi/Wize/Snack
+Vcs-Browser: https://salsa.debian.org/tcltk-team/snack
+Vcs-Git: https://salsa.debian.org/tcltk-team/snack.git
+
+Package: tcl-snack
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}, tcl8.6 | tcl9.0,
+ libsnack-oss (= ${binary:Version}) | libsnack-alsa (= ${binary:Version})
+Suggests: tk8.6 | tk9.0, tcl-snack-doc
+Provides: tcl8.6-snack (= ${binary:Version}), tcl9.0-snack (= ${binary:Version})
+Description: Sound extension to Tcl/Tk and Python/Tkinter - Tcl/Tk library
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+
+Package: libsnack-alsa
+Section: libs
+Architecture: linux-any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libsnack-oss
+Replaces:  libsnack-oss
+Description: Sound extension to Tcl/Tk and Python/Tkinter - ALSA files
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+ .
+ This package includes libraries which use ALSA as a sound engine.
+
+Package: libsnack-oss
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}, osspd | oss-compat
+Conflicts: libsnack-alsa
+Replaces: libsnack-alsa
+Description: Sound extension to Tcl/Tk and Python/Tkinter - OSS files
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+ .
+ This package includes libraries which use OSS as a sound engine.
+
+Package: python3-tksnack
+Section: python
+Architecture: all
+Depends: tcl-snack (>= ${source:Version}), ${python3:Depends}, ${misc:Depends}, python3-tk
+Suggests: tcl-snack-doc
+Description: Sound extension to Tcl/Tk and Python/Tkinter - Python 3.x library
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+ .
+ This package includes Python/Tkinter tkSnack package for Python 3.x.
+
+Package: tcl-snack-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: tcl-snack (= ${binary:Version}), ${misc:Depends}
+Description: Sound extension to Tcl/Tk and Python/Tkinter - development files
+ This package is needed for building transcriber, and contains
+ snackConfig.sh, snack.h.
+ .
+ Snack provides a sound functionality extension to the Tcl/Tk language.
+ .
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+ .
+ This package contains files to be used for development of C-based
+ extensions which use the Snack library.
+
+Package: tcl-snack-doc
+Section: doc
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Suggests: tcl-snack, python3-tksnack
+Description: Sound extension to Tcl/Tk and Python/Tkinter - documentation
+ Snack provides a sound functionality extension to the Tcl/Tk language.
+ .
+ Snack is an extension to the Tcl/Tk scripting language
+ that adds sound functionality. There are commands to play, record,
+ edit, and even visualize sound. Snack supports in-memory sound
+ objects, file based audio, and streaming audio. It handles
+ file formats such as WAV, AU, AIFF, MP3, and OGG Vorbis.
+ .
+ This package contains the HTML documentation for Snack.
