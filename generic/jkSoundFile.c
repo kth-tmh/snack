@@ -2374,7 +2374,7 @@ PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   Tcl_GlobalEvalObj(s->interp, Tcl_NewStringObj(CSL_DATECOMMAND, -1));
   /* Use snprintf with %s to avoid format-string injection from Tcl result. */
   snprintf(&buf[20], (size_t)(HEADBUF - 20), "%s", Tcl_GetStringResult(s->interp));
-  
+
   PutLELong(buf, 40, s->samprate);
   PutLELong(buf, 44, s->length);
   PutLEShort(buf, 48, (short) s->abmax);
