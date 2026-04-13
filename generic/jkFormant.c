@@ -64,17 +64,16 @@ static int	maxp,	/* number of poles to consider */
 
 static short **pc;
 
-static int canbe(pnumb, fnumb) /* can this pole be this freq.? */
-int	pnumb, fnumb;
+static int canbe(int pnumb, int fnumb) /* can this pole be this freq.? */
 {
 return((fre[pnumb] >= fmins[fnumb])&&(fre[pnumb] <= fmaxs[fnumb]));
 }
 
 /* This does the real work of mapping frequencies to formants. */
-static void candy(cand,pnumb,fnumb)
-     int	cand, /* candidate number being considered */
-       pnumb, /* pole number under consideration */
-       fnumb;	/* formant number under consideration */
+static void candy(int cand, int pnumb, int fnumb)
+     /* cand:  candidate number being considered */
+     /* pnumb: pole number under consideration */
+     /* fnumb: formant number under consideration */
 {
   int i,j;
 
@@ -117,10 +116,8 @@ static void candy(cand,pnumb,fnumb)
 /* Given a set of pole frequencies and allowable formant frequencies
    for nform formants, calculate all possible mappings of pole frequencies
    to formants, including, possibly, mappings with missing formants. */
-void get_fcand(npole,freq,band,nform,pcan)
-     int	npole, nform;
-     short **pcan;
-     double	*freq, *band; /* poles ordered by increasing FREQUENCY */
+void get_fcand(int npole, double *freq, double *band, int nform, short **pcan)
+     /* poles ordered by increasing FREQUENCY */
 {	
 
   ncan = 0;
@@ -132,8 +129,7 @@ void get_fcand(npole,freq,band,nform,pcan)
   ncan++;	/* (converts ncan as an index to ncan as a candidate count) */
 }
 
-void set_nominal_freqs(f1)
-     double f1;
+void set_nominal_freqs(double f1)
 {
   int i;
   for(i=0; i < MAXFORMANTS; i++) {
@@ -145,9 +141,7 @@ void set_nominal_freqs(f1)
 
 /*      ----------------------------------------------------------      */
 /* find the maximum in the "stationarity" function (stored in rms) */
-double get_stat_max(pole, nframes)
-     register POLE **pole;
-     register int nframes;
+double get_stat_max(register POLE **pole, register int nframes)
 {
   register int i;
   register double amax, t;
@@ -158,10 +152,7 @@ double get_stat_max(pole, nframes)
   return(amax);
 }
 
-Sound *dpform(ps, nform, nom_f1)
-     Sound *ps;
-     int nform;
-     double nom_f1;
+Sound *dpform(Sound *ps, int nform, double nom_f1)
 {
   double pferr, conerr, minerr, dffact, ftemp, berr, ferr, bfact, ffact,
          rmsmax, fbias, **fr, **ba, rmsdffact, merger=0.0, merge_cost,
@@ -436,11 +427,15 @@ Sound *dpform(ps, nform, nom_f1)
 
 #define MAXORDER 30
 
-extern int formant(), lpc(), lpcbsa(), dlpcwtd(), w_covar();
+extern int dlpcwtd(double *s, int *ls, double *p, int *np, double *c, double *phi, double *shi, double *xl, double *w);
+extern int formant(int lpc_order, double s_freq, double *lpca, int *n_form, double *freq, double *band, int init);
+extern int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data, double *lpca,
+        double *ar, double *lpck, double *normerr, double *rms, double preemp, int type);
+extern int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp);
+extern int w_covar(short *xx, int *m, int n, int istrt, double *y, double *alpha, double *r0, double preemp, int w_type);
 
 /*************************************************************************/
-double integerize(time, freq)
-     register double time, freq;
+double integerize(register double time, register double freq)
 {
   register int i;
 
@@ -449,17 +444,13 @@ double integerize(time, freq)
 }
 
 /*	Round the argument to the nearest integer.			*/
-int eround(flnum)
-register double	flnum;
+int eround(register double	flnum)
 {
 	return((flnum >= 0.0) ? (int)(flnum + 0.5) : (int)(flnum - 0.5));
 }
 
 /*************************************************************************/
-Sound *lpc_poles(sp,wdur,frame_int,lpc_ord,preemp,lpc_type,w_type)
-     Sound *sp;
-     int lpc_ord, lpc_type, w_type;
-     double wdur, frame_int, preemp;
+Sound *lpc_poles(Sound *sp, double wdur, double frame_int, int lpc_ord, double preemp, int lpc_type, int w_type)
 {
   int i, j, size, step, nform, init, nfrm;
   POLE **pole;
@@ -566,10 +557,7 @@ double frand()
 /* a quick and dirty interface to bsa's stabilized covariance LPC */
 #define NPM	30	/* max lpc order		*/
 
-int lpcbsa(np, lpc_stabl, wind, data, lpc, rho, nul1, nul2, energy, preemp)
-     int np, wind;
-     short *data;
-     double *lpc, *rho, *nul1, *nul2, *energy, lpc_stabl, preemp;
+int lpcbsa(int np, double lpc_stabl, int wind, short *data, double *lpc, double *rho, double *nul1, double *nul2, double *energy, double preemp)
 {
   static int i, mm, owind=0, wind1;
   static double w[1000];
@@ -606,18 +594,14 @@ int lpcbsa(np, lpc_stabl, wind, data, lpc, rho, nul1, nul2, energy, preemp)
 
 /*      ----------------------------------------------------------      */
 
-int ratprx(a,k,l,qlim)
-double	a;    
-int	*l, *k, qlim;
+int ratprx(double a, int *k, int *l, int qlim)
 {
     double aa, af, q, em, qq = 0, pp = 0, ps, e;
-    int	ai, ip, i;
+    int	ai, ip, result = FALSE;
     
     aa = fabs(a);
     ai = (int) aa;
-/*    af = fmod(aa,1.0); */
-    i = (int) aa;
-    af = aa - i;
+    af = aa - ai;
     q = 0;
     em = 1.0;
     while(++q <= qlim) {
@@ -628,97 +612,116 @@ int	*l, *k, qlim;
 	    em = e;
 	    pp = ip;
 	    qq = q;
+	    result = TRUE;
 	}
     };
     *k = (int) ((ai * qq) + pp);
     *k = (a > 0)? *k : -(*k);
     *l = (int) qq;
-    return(TRUE);    
+    return(result);
 }
 
 /* ----------------------------------------------------------------------- */
 
-Sound *Fdownsample(s,freq2,start,end)
-     double freq2;
-     Sound *s;
-     int start;
-     int end;
+extern float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time);
+
+Sound *Fdownsample(Sound *s, double freq2, int start, int end)
 {
-  short	*bufin, **bufout;
-  static double	beta = 0.0, b[256];
-  double	ratio_t, maxi, ratio, beta_new, freq1;
-  static int	ncoeff = 127, ncoefft = 0, nbits = 15;
-  static short	ic[256];
-  int	insert, decimate, out_samps, smin, smax;
+  float	*bufin, *bufout, *bufp;
+  int	frame_size = 1024, act_size, first_time, last_time;
+  double	ratio, freq1;
+  int	ncoeff, insert, decimate, total_samps, out_samps, ndone;
   Sound *so;
 
   register int i, j;
 
   freq1 = s->samprate;
-  
-  if((bufout = (short**)ckalloc(sizeof(short*)))) {
-    bufin = (short *) ckalloc(sizeof(short) * (end - start + 1));
-    for (i = start; i <= end; i++) {
-      bufin[i-start] = (short) Snack_GetSample(s, 0, i);
+  ratio = freq2/freq1;
+
+  if (!ratprx(ratio, &insert, &decimate, 10))
+    return(NULL);
+
+  if (decimate <= insert)
+    return(NULL);
+
+  freq1 *= (double)insert;
+  freq2 = freq1/((double)decimate);
+
+  /* filter length used in downsample(): 5ms */
+  ncoeff = ((int)(freq1 * 0.005))/2 + 1;
+
+  total_samps = (end - start + 1) * insert;
+  if (total_samps < (ncoeff * decimate * 3))	/* signal too short */
+    return(NULL);
+
+  if ((bufin = (float *) ckalloc(sizeof(float) * total_samps))) {
+    for (bufp = bufin, i = start; i <= end; i++) {
+      *bufp++ = Snack_GetSample(s, 0, i) * ((float)insert);
+      for(j = 1; j < insert; j++)
+        *bufp++ = 0.0f;	/* insert zeros to boost the sampling frequency */
     }
 
-    ratio = freq2/freq1;
-    ratprx(ratio,&insert,&decimate,10);
-    ratio_t = ((double)insert)/((double)decimate);
+    if ((frame_size * 2) > total_samps)
+      frame_size = (total_samps + 1)/2;
 
-    if(ratio_t > .99) return(s);
-  
-    freq2 = ratio_t * freq1;
-    beta_new = (.5 * freq2)/(insert * freq1);
+    frame_size -= frame_size % decimate;
 
-    if(beta != beta_new){
-      beta = beta_new;
-      if( !lc_lin_fir(beta,&ncoeff,b)) {
-	printf("\nProblems computing interpolation filter\n");
-	return(FALSE);
-      }
-      maxi = (1 << nbits) - 1;
-      j = (ncoeff/2) + 1;
-      for(ncoefft = 0, i=0; i < j; i++){
-	ic[i] = (int) (0.5 + (maxi * b[i]));
-	if(ic[i]) ncoefft = i+1;
-      }
-    }				/*  endif new coefficients need to be computed */
+    first_time = 1;	/* new filter coefficients need to be computed */
 
-    if(dwnsamp(bufin,end-start+1,bufout,&out_samps,insert,decimate,ncoefft,ic,
-	       &smin,&smax)){
-      /*      so->buff_size = so->file_size = out_samps;*/
-      so = Snack_NewSound(0, LIN16, s->nchannels);
-      Snack_ResizeSoundStorage(so, out_samps);
-      for (i = 0; i < out_samps; i++) {
-	Snack_SetSample(so, 0, i, (float)(*bufout)[i]);
+    for (ndone = 0, last_time = 0; !last_time; ndone += act_size) {
+      act_size = total_samps - ncoeff - ndone;
+      if (act_size > frame_size) {
+        act_size = frame_size;
+        out_samps = act_size/decimate;
+      } else {
+        out_samps = act_size/decimate;
+        if (!first_time && ((act_size + ncoeff) <= frame_size)) {
+          act_size += ncoeff;
+          last_time = 1;
+        } else
+          act_size = out_samps * decimate;
       }
-      so->length = out_samps;
-      so->samprate = (int)freq2;
-      ckfree((void *)*bufout);
-      ckfree((void *)bufout);
-      ckfree((void *)bufin);
-      return(so);
-    } else
-      printf("Problems in dwnsamp() in downsample()\n");
+
+      if ((bufout = downsample(bufin+ndone, total_samps-ndone, act_size, freq1,
+                               &out_samps, decimate, first_time, last_time))) {
+        if (first_time) {
+          first_time = 0;
+          so = Snack_NewSound((int)freq2, LIN16, s->nchannels);
+          if (!so) {
+            printf("Can't create a new Signal in downsample()\n");
+            break;
+          }
+          Snack_ResizeSoundStorage(so, total_samps/decimate);
+          so->length = 0;
+        }
+
+        Snack_PutSoundData(so, so->length, bufout, out_samps);
+        so->length += out_samps;
+      } else {
+        printf("Problems in downsample()\n");
+        break;
+      }
+    }
+    ckfree((void *)bufin);
   } else
        printf("Can't create a new Signal in downsample()\n");
   
-  return(NULL);
+  return(so);
 }
 
 /*      ----------------------------------------------------------      */
 
-Sound 
-*highpass(s)
-     Sound *s;
+extern void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init);
+
+Sound *highpass(Sound *s)
 {
 
-  short *datain, *dataout;
-  static short *lcf;
+  float *datain, *dataout;
+  static float *lcf;
   static int len = 0;
   double scale, fn;
   register int i;
+  int	frame_size = 1024, act_size, total_samps, out_samps, ndone, init;
   Sound *so;
 
   /*  Header *h, *dup_header();*/
@@ -727,28 +730,62 @@ Sound
   /* This assumes the sampling frequency is 10kHz and that the FIR
      is a Hanning function of (LCSIZ/10)ms duration. */
 
-  datain = (short *) ckalloc(sizeof(short) * s->length);
-  dataout = (short *) ckalloc(sizeof(short) * s->length);
-  for (i = 0; i < Snack_GetLength(s); i++) {
-    datain[i] = (short) Snack_GetSample(s, 0, i);
+  if(!len) {		/* need to create a Hanning FIR? */
+    lcf = (float *) ckalloc(sizeof(float) * LCSIZ);
+    len = 1 + (LCSIZ/2);
+    fn = M_PI * 2.0 / (LCSIZ - 1);
+    scale = 1.0/(.5 * LCSIZ);
+    for (i=0; i < len; i++)
+      lcf[i] = (float) (scale * (.5 + (.4 * cos(fn * ((double)i)))));
   }
 
-  if(!len) {		/* need to create a Hanning FIR? */
-    lcf = (short*)ckalloc(sizeof(short) * LCSIZ);
-    len = 1 + (LCSIZ/2);
-    fn = PI * 2.0 / (LCSIZ - 1);
-    scale = 32767.0/(.5 * LCSIZ);
-    for(i=0; i < len; i++) 
-      lcf[i] = (short) (scale * (.5 + (.4 * cos(fn * ((double)i)))));
+  total_samps = s->length;
+  if (total_samps < (len * 3))
+    total_samps = len * 3;
+
+  datain = (float *) ckalloc(sizeof(float) * total_samps);
+  dataout = (float *) ckalloc(sizeof(float) * total_samps);
+  if (!datain || !dataout) {
+    printf("Can't create a new Signal in highpass()\n");
+    return(NULL);
   }
-  do_fir(datain,s->length,dataout,len,lcf,1); /* in downsample.c */
+
+  Snack_GetSoundData(s, 0, datain, s->length);
+
+  for (i = s->length; i < total_samps; i++)
+    datain[i] = 0.0;
+
+  if (frame_size > total_samps)
+    frame_size = total_samps;
+
+  for (ndone = 0, init = 1; !(init & 2); ndone += act_size) {
+    act_size = total_samps - len - ndone;
+    if (act_size > frame_size) {
+      out_samps = act_size = frame_size;
+    } else {
+      out_samps = act_size;
+      if (!(init & 1) && ((act_size + len) <= frame_size)) {
+        act_size += len;
+        init = 2;
+      }
+    }
+
+    do_ffir(datain+ndone, total_samps-ndone, dataout+ndone,
+            &out_samps, act_size, len, lcf, 1, 1, init);
+
+    if (init & 1)
+      init = 0;
+  }
+
   so = Snack_NewSound(s->samprate, LIN16, s->nchannels);
-  if (so == NULL) return(NULL);
-  Snack_ResizeSoundStorage(so, s->length);
-  for (i = 0; i < s->length; i++) {
-    Snack_SetSample(so, 0, i, (float)dataout[i]);
+  if (!so) {
+    printf("Can't create a new Signal in highpass()\n");
+  } else {
+    Snack_ResizeSoundStorage(so, s->length);
+    Snack_PutSoundData(so, 0, dataout, s->length);
+    so->length = s->length;
   }
-  so->length = s->length;
+
   ckfree((void *)dataout);
   ckfree((void *)datain);
   return(so);

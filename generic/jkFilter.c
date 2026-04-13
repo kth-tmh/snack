@@ -208,7 +208,7 @@ filterObjCmd(ClientData clientData, Tcl_Interp *interp, int objc,
 	     Tcl_Obj *CONST objv[])
 {
   Snack_Filter f = (Snack_Filter) clientData;
-  int length = 0;
+  Tcl_Size length = 0;
   char *string = NULL;
   Tcl_HashEntry *hPtr;
   
@@ -253,7 +253,7 @@ Snack_FilterCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   char *name;
   Tcl_HashTable *hTab = (Tcl_HashTable *) cdata;
   Tcl_HashEntry *hPtr;
-  int length = 0;
+  Tcl_Size length = 0;
   char *string = NULL;
 
   if (objc < 2) {

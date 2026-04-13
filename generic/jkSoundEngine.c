@@ -976,7 +976,8 @@ playCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
   s->devStr = defaultOutDevice;
 
   for (arg = 2; arg < objc; arg+=2) {
-    int index, length;
+    int index;
+    Tcl_Size length;
     char *str;
     
     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings,
@@ -1366,7 +1367,8 @@ recordCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   s->tmpbuf = NULL;
       
   for (arg = 2; arg < objc; arg+=2) {
-    int index, length;
+    int index;
+    Tcl_Size length;
     char *str;
     
     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings, "option",
@@ -1704,7 +1706,8 @@ int
 current_positionCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
   int n = -1;
-  int arg, len, type = 0;
+  int arg, type = 0;
+  Tcl_Size len;
   jkQueuedSound *p;
 
   if (soundQueue != NULL) {

@@ -25,8 +25,7 @@
 #include <math.h>
 #include <string.h>
 #include "tcl.h"
-#include "jkAudIO.h"
-#include "jkSound.h"
+#include "snack.h"
 
 extern int rop, wop;
 

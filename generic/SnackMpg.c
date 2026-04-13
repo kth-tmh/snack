@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include "mpg123.h"
+#include <string.h>
+#include <ctype.h>
 
 #if defined(__WIN32__)
 #  include <io.h>
@@ -129,7 +131,7 @@ GuessMpg123File(char *buf, int len)
 {
     long rate;
     int channels, enc;
-    int fnd = 0, ret, done;
+    int fnd = 0, ret; size_t done;
     mpg123_handle *m;
     unsigned char *ubuf = buf;
     unsigned char pcmout[4*sizeof(short)*20000];
@@ -195,7 +197,7 @@ Mpg123Setup(Sound *s, Tcl_Interp *interp, Tcl_Channel ch)
     Mpg123_File *of;
     int ret, fd, rc;
     long mlen;
-    Tcl_ChannelType *cType;
+    const Tcl_ChannelType *cType;
 
     of = MpgObj(s);
     of->isFile = 0;
@@ -334,7 +336,7 @@ CloseMpg123File(Sound *s, Tcl_Interp *interp, Tcl_Channel *ch)
                 mpg123_seek(of->m, of->savepos[of->ref], SEEK_SET);
             }
         }
-        return;
+        return TCL_OK;
     }
 
     FreeRes(of);
@@ -393,11 +395,11 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
             Snack_SetNumChannels(s, of->channels);
         }
         if (rc == MPG123_DONE) {
-            if (s->debug) fprintf(stderr, "MPG DONE: %d\n", nread);
+            if (s->debug) fprintf(stderr, "MPG DONE: %zu\n", nread);
             return nread;
         }
         if (rc == MPG123_ERR) {
-            if (s->debug) fprintf(stderr, "MPG ERROR: %d\n", nread);
+            if (s->debug) fprintf(stderr, "MPG ERROR: %zu\n", nread);
             return 0;
         }
         r = (short *) of->pcmbuf;
@@ -408,7 +410,7 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
             r++;
         }
         nread += cnt;
-        if (s->debug) fprintf(stderr, "MPG READ (%d of %d): %d\n", nread, len, rc);
+        if (s->debug) fprintf(stderr, "MPG READ (%zu of %d): %d\n", nread, len, rc);
         if (cnt >= len) break;
         len -= cnt;
     }
@@ -432,7 +434,7 @@ ReadMpg123Samples(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, char *ibuf,
     iread = (int)nread;
     if (iread < 0)
     iread = 1;
-    if (s->debug) fprintf(stderr, "MPG READ RET: %d\n", nread);
+    if (s->debug) fprintf(stderr, "MPG READ RET: %zu\n", nread);
     return iread;
 }
 
@@ -458,7 +460,7 @@ SeekMpg123File(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, int pos)
     }
     opos = mpg123_tell(of->m);
     if (pos == opos) {
-        if (s->debug) fprintf(stderr, "MPG SEEK NOMOVE: %d\n", opos, pos);
+        if (s->debug) fprintf(stderr, "MPG SEEK NOMOVE: %d->%d\n", opos, pos);
     }
     opos = pos;
 
@@ -782,7 +784,7 @@ EXPORT(int, Snackmpg_Init) _ANSI_ARGS_((Tcl_Interp *interp))
     int res;
   
 #ifdef USE_TCL_STUBS
-    if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+    if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR;
     }
 #endif

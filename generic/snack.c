@@ -137,7 +137,7 @@ int
 Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
 	       Tcl_Obj *CONST objv[])
 {
-  int len;
+  Tcl_Size len;
   char *str;
   CONST84 char *patchLevelStr;
   
@@ -233,7 +233,7 @@ Snack_Init(Tcl_Interp *interp)
   char rates[100];
   
 #ifdef USE_TCL_STUBS
-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }
 #endif
@@ -258,7 +258,7 @@ Snack_Init(Tcl_Interp *interp)
 
   if (Tcl_GetCommandInfo(interp, "button", &infoPtr) != 0) {
 #ifdef USE_TK_STUBS
-    if (Tk_InitStubs(interp, "8", 0) == NULL) {
+    if (Tk_InitStubs(interp, TK_VERSION, 0) == NULL) {
       return TCL_ERROR;
     }
 #endif

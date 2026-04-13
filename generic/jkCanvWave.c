@@ -20,12 +20,11 @@
  */
 
 #include "tcl.h"
-#include "snack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#define USE_OLD_CANVAS /* To keep Tk8.3 happy */
 #include "tk.h"
+#include "snack.h"
 #include "jkCanvItems.h"
 #include <string.h>
 
@@ -191,12 +190,12 @@ static Tk_ConfigSpec configSpecs[] = {
   static int    ComputeWaveCoords(Tk_Item *itemPtr);
   
   static int    ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, 
-			      Tk_Item *itemPtr, int argc,
-			      char **argv, int flags);
+			      Tk_Item *itemPtr, Tcl_Size argc,
+			      Tcl_Obj *const argv[], int flags);
 
   static int    CreateWave(Tcl_Interp *interp, Tk_Canvas canvas,
 			   struct Tk_Item *itemPtr,
-			   int argc, char **argv);
+			   Tcl_Size argc, Tcl_Obj *const argv[]);
 
   static void   DeleteWave(Tk_Canvas canvas, Tk_Item *itemPtr,
 			   Display *display);
@@ -213,7 +212,7 @@ static Tk_ConfigSpec configSpecs[] = {
 			      double deltaX, double deltaY);
   
   static int    WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas,
-			   Tk_Item *itemPtr, int argc, char **argv);
+			   Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
   
   static int    WaveToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
 			   double *rectPtr);
@@ -237,7 +236,7 @@ Tk_ItemType snackWaveType = {
   WaveCoords,
   DeleteWave,
   DisplayWave,
-  0,
+  TK_CONFIG_OBJS,
   WaveToPoint,
   WaveToArea,
   WaveToPS,
@@ -253,7 +252,7 @@ Tk_ItemType snackWaveType = {
 
 static int
 CreateWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-	   int argc, char **argv)
+	   Tcl_Size argc, Tcl_Obj *const argv[])
 {
   WaveItem *wavePtr = (WaveItem *) itemPtr;
   int i;
@@ -315,7 +314,9 @@ CreateWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   wavePtr->y = 0;
 
   for (i = 1; i < argc; i++) {
-      if ((argv[i][0] == '-') && (argv[i][1] >= 'a') && (argv[i][1] <= 'z')) {
+      Tcl_Size len;
+      char *str = Tcl_GetStringFromObj(argv[i], &len);
+      if ((len >= 2) && (str[0] == '-') && (str[1] >= 'a') && (str[1] <= 'z')) {
 	  break;
       }
   }
@@ -396,12 +397,11 @@ WaveMaxMin(WaveItem *wavePtr, SnackLinkedFileInfo *info, int start, int stop,
 }
 
 static int
-WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
-	   char **argv)
+WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, Tcl_Size argc,
+	   Tcl_Obj *const argv[])
 {
   WaveItem *wPtr = (WaveItem *) itemPtr;
   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
-  char **oargv = argv;
   int result = TCL_OK;
 
   if (argc == 0) {
@@ -412,14 +412,14 @@ WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
   }
   
   if (argc == 1) {
-      if (Tcl_SplitList(interp, argv[0], &argc, &argv) != TCL_OK) {
+      if (Tcl_ListObjGetElements(interp, argv[0], &argc, (Tcl_Obj ***) &argv) != TCL_OK) {
 	  return TCL_ERROR;
       }
   }
 
   if (argc == 2) {
-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+    if ((Tk_CanvasGetCoordFromObj(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
+	(Tk_CanvasGetCoordFromObj(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
       result = TCL_ERROR;
     } else {
       ComputeWaveBbox(canvas, wPtr);
@@ -427,14 +427,10 @@ WaveCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int argc,
   } else {
     char buf[80];
 
-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
+    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", (int)argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
     result = TCL_ERROR;
-  }
-done:
-  if (oargv != argv) {
-      ckfree( (char*)argv);
   }
   return result;
 }
@@ -910,7 +906,7 @@ UpdateWave(ClientData clientData, int flag)
 
 static int
 ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-	      int argc, char **argv, int flags)
+	      Tcl_Size argc, Tcl_Obj *const argv[], int flags)
 {
   WaveItem *wavePtr = (WaveItem *) itemPtr;
   Sound *s = wavePtr->sound;
@@ -923,15 +919,16 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
   if (argc == 0) return TCL_OK;
 
-  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
-			 (CONST84 char **)argv,
-			 (char *) wavePtr, flags) != TCL_OK) return TCL_ERROR;
+  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc, (void *)argv,
+			 (char *) wavePtr, flags|TK_CONFIG_OBJS) != TCL_OK) return TCL_ERROR;
 
   if (wavePtr->debug > 1) Snack_WriteLog("  Enter ConfigureWave\n");
 
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     for (j = 0; j < argc; j += 2) {
-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+      Tcl_Size len;
+      char *str = Tcl_GetStringFromObj(argv[j], &len);
+      if (strncmp(str, configSpecs[i].argvName, len) == 0) {
 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
 	break;
       }
@@ -940,25 +937,28 @@ ConfigureWave(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 #if defined(MAC)
   for (i = 0; i < argc; i++) {
-    if (strncmp(argv[i], "-anchor", strlen(argv[i])) == 0) {
+    Tcl_Size l;
+    char *str = Tcl_GetStringFromObj(argv[i], &l);
+    if (strncmp(str, "-anchor", l) == 0) {
       i++;
-      if (strcmp(argv[i], "ne") == 0) {
+      str = Tcl_GetStringFromObj(argv[i], &l);
+      if (strcmp(str, "ne") == 0) {
 	wavePtr->anchor = 1;
-      } else if (strcmp(argv[i], "nw") == 0) {
+      } else if (strcmp(str, "nw") == 0) {
 	wavePtr->anchor = 7;
-      } else if (strcmp(argv[i], "n") == 0) {
+      } else if (strcmp(str, "n") == 0) {
 	wavePtr->anchor = 0;
-      } else if (strcmp(argv[i], "e") == 0) {
+      } else if (strcmp(str, "e") == 0) {
 	wavePtr->anchor = 2;
-      } else if (strcmp(argv[i], "se") == 0) {
+      } else if (strcmp(str, "se") == 0) {
 	wavePtr->anchor = 3;
-      } else if (strcmp(argv[i], "sw") == 0) {
+      } else if (strcmp(str, "sw") == 0) {
 	wavePtr->anchor = 5;
-      } else if (strcmp(argv[i], "s") == 0) {
+      } else if (strcmp(str, "s") == 0) {
 	wavePtr->anchor = 4;
-      } else if (strcmp(argv[i], "w") == 0) {
+      } else if (strcmp(str, "w") == 0) {
 	wavePtr->anchor = 6;
-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
+      } else if (strncmp(str, "center", l) == 0) {
 	wavePtr->anchor = 8;
       }
       break;

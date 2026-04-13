@@ -98,7 +98,7 @@ static int
 iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
 	       Tcl_Obj *CONST objv[])
 {
-  int j, n;
+  Tcl_Size j, n;
   Tcl_Obj **impObj;
   double dither, noise;
   iirFilter_t iir = (iirFilter_t) f;
@@ -122,6 +122,12 @@ iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
        and makes faster decisions next time */
     if (Tcl_GetIndexFromObj(interp, objv[arg], optionStrings, "option", 0,
 			    &index) != TCL_OK) {
+      return TCL_ERROR;
+    }
+    
+    if (arg + 1 == objc) {
+      Tcl_AppendResult(interp, "No argument given for ",
+		       optionStrings[index], " option", (char *) NULL);
       return TCL_ERROR;
     }
     

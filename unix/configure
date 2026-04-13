@@ -1575,6 +1575,10 @@ case $system in
 	AOBJ="jkAudIO_osx.o"
 	CFLAGS="-Os -fno-common"
         ;;
+    GNU-*)
+	AFLAG="-DOSS"
+	AOBJ="jkAudIO_oss.o"
+	;;
     *)
 	AFLAG="-DOTHER"
 	AOBJ="jkAudIO_skel.o"

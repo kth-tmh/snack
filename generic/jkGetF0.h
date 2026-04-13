@@ -58,9 +58,17 @@ int   n_cands,		/* max. # of F0 cands. to consider at each frame */
 #define F0_PC_DIFF	0x010		/* 1st-order difference */
 
 extern F0_params *new_f0_params();
-extern int atoi(), eround(), lpc(), window(), get_window();
-extern void get_fast_cands(), a_to_aca(), cross(), crossf(), crossfi(),
+extern int eround(register double flnum);
+extern int lpc(), get_window();
+extern int window(register float *din, register float *dout, register int n, register float preemp, int type);
+extern void a_to_aca(), cross(),
            autoc(), durbin();
+extern void crossf(float *data, int size, int start, int nlags, float *engref, int *maxloc, float *maxval, float *correl);
+extern void crossfi(float *data, int size, int start0, int nlags0, int nlags, float *engref, int *maxloc, float *maxval, float *correl, int *locs, int nlocs);
+extern int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca, float *ar, float *lpck, float *normerr, float *rms, float preemp, int type);
+extern float wind_energy(register float *data, register int size, register int w_type);
+extern void xa_to_aca(float *a, float *b, float *c, register int p);
+extern float xitakura(register int p, register float *b, register float *c, register float *r, register float *gain);
 
 #define Fprintf (void)fprintf
 
@@ -106,4 +114,4 @@ typedef struct frame_rec{
   struct frame_rec *prev;
 } Frame;
 
-extern   Frame *alloc_frame();
+extern   Frame *alloc_frame(int nlags, int ncands);

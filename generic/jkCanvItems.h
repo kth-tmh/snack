@@ -108,6 +108,10 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
   extern double hypot(double x, double y);
 #endif
 
+#ifndef TK_CONFIG_OPTION_SPECIFIED
+#  define TK_CONFIG_OPTION_SPECIFIED      (1 << 4)
+#endif
+
 #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)
 
 #ifdef __cplusplus
