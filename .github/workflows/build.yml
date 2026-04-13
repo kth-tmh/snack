@@ -1,0 +1,60 @@
+name: Build (Linux & macOS)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tcl-dev tk-dev libasound2-dev
+
+      - name: Configure
+        working-directory: unix
+        run: ./configure --enable-alsa
+
+      - name: Build
+        working-directory: unix
+        run: make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: snack-linux
+          path: unix/libsnack*.so
+          if-no-files-found: warn
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install tcl-tk
+
+      - name: Configure
+        working-directory: unix
+        run: |
+          TCL_PREFIX=$(brew --prefix tcl-tk)
+          ./configure \
+            --with-tcl="$TCL_PREFIX/lib" \
+            --with-tk="$TCL_PREFIX/lib"
+
+      - name: Build
+        working-directory: unix
+        run: make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: snack-macos
+          path: unix/libsnack*.dylib
+          if-no-files-found: warn
