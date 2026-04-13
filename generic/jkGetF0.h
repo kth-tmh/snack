@@ -57,10 +57,28 @@ int   n_cands,		/* max. # of F0 cands. to consider at each frame */
 #define F0_PC_AR	0x08		/* inf_order-order LPC inverse filter */
 #define F0_PC_DIFF	0x010		/* 1st-order difference */
 
-extern F0_params *new_f0_params();
-extern int atoi(), eround(), lpc(), window(), get_window();
-extern void get_fast_cands(), a_to_aca(), cross(), crossf(), crossfi(),
-           autoc(), durbin();
+extern F0_params *new_f0_params(void);
+extern int eround(double x);
+extern int lpc(int lpc_ord, double lpc_stabl, int wsize, short *data,
+               double *lpca, double *ar, double *lpck, double *normerr,
+               double *rms, double preemp, int type);
+extern int window(float *din, float *dout, int n, float preemp, int type);
+extern int get_window(double *dout, int n, int type);
+extern void get_fast_cands(float *fdata, float *fdsdata, int ind, int step,
+                           int size, int dec, int start, int nlags,
+                           float *engref, int *maxloc, float *maxval,
+                           Cross *cp, float *peaks, int *locs,
+                           int *ncand, F0_params *par);
+extern void a_to_aca(double *a, double *b, double *c, int p);
+extern void cross(float *data, int size, int start, int nlags,
+                  float *engref, int *maxloc, float *maxval, float *correl);
+extern void crossf(float *data, int size, int start, int nlags,
+                   float *engref, int *maxloc, float *maxval, float *correl);
+extern void crossfi(float *data, int size, int start0, int nlags0, int nlags,
+                    float *engref, int *maxloc, float *maxval, float *correl,
+                    int *locs, int nlocs);
+extern void autoc(int windowsize, double *s, int p, double *r, double *e);
+extern void durbin(double *r, double *k, double *a, int p, double *ex);
 
 #define Fprintf (void)fprintf
 
@@ -106,4 +124,4 @@ typedef struct frame_rec{
   struct frame_rec *prev;
 } Frame;
 
-extern   Frame *alloc_frame();
+extern Frame *alloc_frame(int nlags, int ncands);
