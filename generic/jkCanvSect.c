@@ -357,7 +357,7 @@ SectionCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   } else {
     char buf[80];
 
-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
+    snprintf(buf, sizeof(buf), "wrong # coordinates: expected 0 or 2, got %d", argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
     return TCL_ERROR;
@@ -814,14 +814,16 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       }
       sectPtr->sound = s;
       if (sectPtr->soundName == NULL) {
-	sectPtr->soundName = ckalloc(strlen(sectPtr->newSoundName)+1);
-	strcpy(sectPtr->soundName, sectPtr->newSoundName);
+	size_t nlen = strlen(sectPtr->newSoundName) + 1;
+	sectPtr->soundName = ckalloc(nlen);
+	memcpy(sectPtr->soundName, sectPtr->newSoundName, nlen);
       }
       if (strcmp(sectPtr->soundName, sectPtr->newSoundName) != 0) {
+	size_t nlen = strlen(sectPtr->newSoundName) + 1;
 	Sound *t = Snack_GetSound(interp, sectPtr->soundName);
 	ckfree(sectPtr->soundName);
-	sectPtr->soundName = ckalloc(strlen(sectPtr->newSoundName)+1);
-	strcpy(sectPtr->soundName, sectPtr->newSoundName);
+	sectPtr->soundName = ckalloc(nlen);
+	memcpy(sectPtr->soundName, sectPtr->newSoundName, nlen);
 	sectPtr->nPoints = 0;
 	sectPtr->ssmp    = 0;
 	sectPtr->esmp    = -1;
@@ -1202,34 +1204,34 @@ SectionToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int prepass)
 
   Tcl_AppendResult(interp, "%% SECT BEGIN\n", (char *) NULL);
 
-  sprintf(buffer, "%.15g %.15g moveto\n", coords[0] + xo,
+  snprintf(buffer, sizeof(buffer), "%.15g %.15g moveto\n", coords[0] + xo,
 	  Tk_CanvasPsY(canvas, (double) (coords[1] + yo)));
   Tcl_AppendResult(interp, buffer, (char *) NULL);
   coords += 2;
   for (nPoints--; nPoints > 0; nPoints--) {
-    sprintf(buffer, "%.15g %.15g lineto\n", coords[0] + xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", coords[0] + xo,
 	    Tk_CanvasPsY(canvas, (double) (coords[1] + yo)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
     coords += 2;
   }
 
   if (sectPtr->frame) {
-    sprintf(buffer, "%.15g %.15g moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) (yo + sectPtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) (yo + sectPtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
   }

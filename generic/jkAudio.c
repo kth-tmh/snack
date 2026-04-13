@@ -48,10 +48,11 @@ char defaultInDevice[MAX_DEVICE_NAME_LENGTH];
 char *
 SnackStrDup(const char *str)
 {
-  char *new = ckalloc(strlen(str)+1);
+  size_t len = strlen(str);
+  char *new = ckalloc(len + 1);
 
   if (new) {
-    strcpy(new, str);
+    memcpy(new, str, len + 1);
   }
 
   return new;
@@ -108,7 +109,8 @@ selectOutCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     devstr = Tcl_GetStringFromObj(objv[2], NULL);
     for (i = 0; i < n; i++) {
       if (strncmp(devstr, arr[i], strlen(devstr)) == 0 && found == 0) {
-	strcpy(defaultOutDevice, arr[i]);
+	strncpy(defaultOutDevice, arr[i], MAX_DEVICE_NAME_LENGTH - 1);
+	defaultOutDevice[MAX_DEVICE_NAME_LENGTH - 1] = '\0';
 	found = 1;
       }
       ckfree(arr[i]);
@@ -138,7 +140,8 @@ selectInCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     devstr = Tcl_GetStringFromObj(objv[2], NULL);
     for (i = 0; i < n; i++) {
       if (strncmp(devstr, arr[i], strlen(devstr)) == 0 && found == 0) {
-	strcpy(defaultInDevice, arr[i]);
+	strncpy(defaultInDevice, arr[i], MAX_DEVICE_NAME_LENGTH - 1);
+	defaultInDevice[MAX_DEVICE_NAME_LENGTH - 1] = '\0';
 	found = 1;
       }
       ckfree(arr[i]);
