@@ -30,6 +30,20 @@ extern "C" {
 #   define CONST84 const
 #endif
 
+#ifndef CONST
+#   define CONST const
+#endif
+
+/* TCL_INTERP_DESTROYED was renamed TCL_INTERP_DELETED in Tcl 9 */
+#ifndef TCL_INTERP_DESTROYED
+#   define TCL_INTERP_DESTROYED 0x800
+#endif
+
+/* TCL_PARSE_PART1 was removed in Tcl 9; the behaviour is always on */
+#ifndef TCL_PARSE_PART1
+#   define TCL_PARSE_PART1 0
+#endif
+
 #ifdef HPUX
 #  include <Alib.h>
 #endif

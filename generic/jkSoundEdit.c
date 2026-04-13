@@ -1461,7 +1461,7 @@ sampleCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
   int i, n, val;
   double fval;
-  char buf[20];
+  char buf[64];
 
   if (objc < 3) {
     Tcl_WrongNumArgs(interp, 1, objv, "sample index ?val? ...");
@@ -1496,24 +1496,24 @@ sampleCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       case LIN8:
 	if (s->storeType == SOUND_IN_MEMORY) {
 	  if (s->precision == SNACK_SINGLE_PREC) {
-	    sprintf(buf, "%d", (int) FSAMPLE(s, i));
+	    snprintf(buf, sizeof(buf), "%d", (int) FSAMPLE(s, i));
 	  } else {
-	    sprintf(buf, "%d", (int) DSAMPLE(s, i));
+	    snprintf(buf, sizeof(buf), "%d", (int) DSAMPLE(s, i));
 	  }
 	} else {
-	  sprintf(buf, "%d", (int) GetSample(&s->linkInfo, i));
+	  snprintf(buf, sizeof(buf), "%d", (int) GetSample(&s->linkInfo, i));
 	}
 	break;
       case SNACK_FLOAT:
       case SNACK_DOUBLE:
 	if (s->storeType == SOUND_IN_MEMORY) {
 	  if (s->precision == SNACK_SINGLE_PREC) {
-	    sprintf(buf, "%f", FSAMPLE(s, i));
+	    snprintf(buf, sizeof(buf), "%f", FSAMPLE(s, i));
 	  } else {
-	    sprintf(buf, "%.12f", DSAMPLE(s, i));
+	    snprintf(buf, sizeof(buf), "%.12f", DSAMPLE(s, i));
 	  }
 	} else {
-	  sprintf(buf, "%f", GetSample(&s->linkInfo, i));
+	  snprintf(buf, sizeof(buf), "%f", GetSample(&s->linkInfo, i));
 	}
 	break;
       }

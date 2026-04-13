@@ -31,7 +31,7 @@
  * Dout is assumed to be at least n elements long.  Type is decoded in
  * the switch statement below.
  */
-int xget_window(register float *dout, register int n, register int type)
+int xget_window(register float *dout, register int n, int type)
 {
   static float *din = NULL;
   static int n0 = 0;
@@ -55,7 +55,7 @@ int xget_window(register float *dout, register int n, register int type)
   
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* Apply a rectangular window (i.e. none).  Optionally, preemphasize. */
-void xrwindow(register float *din, register float *dout, register int n, register float preemp)
+void xrwindow(register float *din, register float *dout, register int n, float preemp)
 {
   register float *p;
  
@@ -72,7 +72,7 @@ void xrwindow(register float *din, register float *dout, register int n, registe
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* Generate a cos^4 window, if one does not already exist. */
-void xcwindow(register float *din, register float *dout, register int n, register float preemp)
+void xcwindow(register float *din, register float *dout, register int n, float preemp)
 {
   register int i;
   register float *p;
@@ -104,7 +104,7 @@ void xcwindow(register float *din, register float *dout, register int n, registe
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* Generate a Hamming window, if one does not already exist. */
-void xhwindow(register float *din, register float *dout, register int n, register float preemp)
+void xhwindow(register float *din, register float *dout, register int n, float preemp)
 {
   register int i;
   register float *p;
@@ -134,7 +134,7 @@ void xhwindow(register float *din, register float *dout, register int n, registe
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /* Generate a Hanning window, if one does not already exist. */
-void xhnwindow(register float *din, register float *dout, register int n, register float preemp)
+void xhnwindow(register float *din, register float *dout, register int n, float preemp)
 {
   register int i;
   register float *p;
@@ -167,7 +167,7 @@ void xhnwindow(register float *din, register float *dout, register int n, regist
  * in din.  Return the floating-point result sequence in dout.  If preemp
  * is non-zero, apply preemphasis to tha data as it is windowed.
  */
-int window(register float *din, register float *dout, register int n, register float preemp, int type)
+int window(register float *din, register float *dout, register int n, float preemp, int type)
 {
   switch(type) {
   case 0:			/* rectangular */
@@ -228,8 +228,7 @@ void xautoc(register int windowsize, register float *s, register int p, register
  * Note: durbin returns the coefficients in normal sign format.
  *	(i.e. a[0] is assumed to be = +1.)
  */
-void xdurbin (register float *r, register float *k, register float *a, register int p, register float *ex)
-     /* p: analysis order */
+void xdurbin(register float *r, register float *k, register float *a, register int p, register float *ex)
 {
   float  bb[BIGSORD];
   register int i, j;
@@ -263,7 +262,7 @@ void xdurbin (register float *r, register float *k, register float *a, register 
  *  The magnitude of a is returned in c.
  *  2* the other autocorrelation coefficients are returned in b.
  */
-void xa_to_aca (float *a, float *b, float *c, register int p)
+void xa_to_aca(float *a, float *b, float *c, register int p)
 {
   register float  s, *ap, *a0;
   register int  i, j;
@@ -289,7 +288,7 @@ void xa_to_aca (float *a, float *b, float *c, register int p)
  * r is assumed normalized and r[0]=1 is not explicitely accessed.
  * Values returned by the function are >= 1.
  */
-float xitakura (register int p, register float *b, register float *c, register float *r, register float *gain)
+float xitakura(register int p, register float *b, register float *c, register float *r, register float *gain)
 {
   register float s;
 
@@ -304,10 +303,7 @@ float xitakura (register int p, register float *b, register float *c, register f
  * is weighted by a window of type w_type before RMS computation.  w_type
  * is decoded above in window().
  */
-float wind_energy(register float *data, register int size, register int w_type)
-     /* data:   input PCM data */
-     /* size:   size of window */
-     /* w_type: window type */
+float wind_energy(register float *data, register int size, int w_type)
 {
   static int nwind = 0;
   static float *dwind = NULL;
@@ -337,18 +333,8 @@ float wind_energy(register float *data, register int size, register int w_type)
 /* Generic autocorrelation LPC analysis of the short-integer data
  * sequence in data.
  */
-int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca, float *ar, float *lpck, float *normerr, float *rms, float preemp, int type)
-    /* lpc_ord:	Analysis order */
-    /* wsize:	window size in points */
-    /* type:	window type (decoded in window() above) */
-    /* lpc_stabl: Stability factor to prevent numerical problems. */
-    /* lpca:	if non-NULL, return vvector for predictors */
-    /* ar:	if non-NULL, return vector for normalized autoc. */
-    /* lpck:	if non-NULL, return vector for PARCOR's */
-    /* normerr:	return scaler for normalized error */
-    /* rms:	return scaler for energy in preemphasized window */
-    /* preemp: */
-    /* data:	input data sequence; assumed to be wsize+1 long */
+int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca,
+	 float *ar, float *lpck, float *normerr, float *rms, float preemp, int type)
 {
   static float *dwind=NULL;
   static int nwind=0;
@@ -417,7 +403,8 @@ int xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data, float *lpca, floa
   correl is the array of nlags cross-correlation coefficients (-1.0 to 1.0)
  *
  */
-void crossf(float *data, int size, int start, int nlags, float *engref, int *maxloc, float *maxval, float *correl)
+void crossf(float *data, int size, int start, int nlags, float *engref,
+	    int *maxloc, float *maxval, float *correl)
 {
   static float *dbdata=NULL;
   static int dbsize = 0;
@@ -511,7 +498,9 @@ void crossf(float *data, int size, int start, int nlags, float *engref, int *max
   nlocs is the number of correlation patches to compute.
  *
  */
-void crossfi(float *data, int size, int start0, int nlags0, int nlags, float *engref, int *maxloc, float *maxval, float *correl, int *locs, int nlocs)
+void crossfi(float *data, int size, int start0, int nlags0, int nlags,
+	     float *engref, int *maxloc, float *maxval, float *correl,
+	     int *locs, int nlocs)
 {
   static float *dbdata=NULL;
   static int dbsize = 0;

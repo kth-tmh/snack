@@ -106,8 +106,8 @@ class TkObject:
         self.configure({key: value})
 
     def keys(self):
-        return map(lambda x: x[0][1:],
-                   self.tk.split(self.tk.call(self.name, 'configure')))
+        return list(map(lambda x: x[0][1:],
+                   self.tk.split(self.tk.call(self.name, 'configure'))))
 
     def __str__(self):
         return self.name
@@ -206,8 +206,8 @@ class Sound (TkObject):
     def formant(self, **kw):
         """Returns a list of formant trajectories."""
         result = self.tk.call((self.name, 'formant') + self._options(kw))
-        return map(self._getdoubles, self.tk.splitlist(result))
-    
+        return list(map(self._getdoubles, self.tk.splitlist(result)))
+
     def flush(self):
         """Removes all audio data from the sound."""
         self.tk.call(self.name, 'flush')
@@ -218,7 +218,7 @@ class Sound (TkObject):
         """
         result = self.tk.call(self.name, 'info')
         if format == 'list':
-            return map(self._cast, string.split(result))
+            return list(map(_cast, result.split()))
         else:
             return result
         
@@ -264,7 +264,7 @@ class Sound (TkObject):
         else:
             result = self.tk.call((self.name, 'pitch', '-method', method) + 
                                   self._options(kw))
-            return map(self._getdoubles, self.tk.splitlist(result))
+            return list(map(self._getdoubles, self.tk.splitlist(result)))
 
     def play(self, **kw):
         """Plays the sound."""
