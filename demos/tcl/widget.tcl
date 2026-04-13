@@ -1,6 +1,6 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.4 "$0" "$@"
+exec wish8.5 "$0" "$@"
 
 package require -exact snack 2.2
 package require http
@@ -140,6 +140,7 @@ proc Run {script {demoFlag 0}} {
   set i [interp create]
   load {} Tk $i
   $i eval rename exit dontexit
+  $i eval [list set auto_path $::auto_path]
   interp alias $i exit {} interp delete $i
   if {$demoFlag != 0} {
     $i eval set demoFlag $demoFlag

@@ -32,6 +32,8 @@ if {$::tcl_platform(platform) == "unix"} {
 namespace eval snack {
     namespace export gainBox get* add* menu* frequencyAxis timeAxis \
 	    createIcons mixerDialog sound audio mixer debug
+    variable script [file join [pwd] [info script]]
+    variable dirname [file dirname $script]
 
     #
     # Gain control dialog
