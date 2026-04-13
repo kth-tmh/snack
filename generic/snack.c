@@ -168,6 +168,7 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     str = Tcl_GetStringFromObj(objv[3], &len);
     snackDumpFile = (char *) ckalloc(len + 1);
     memcpy(snackDumpFile, str, (size_t)len + 1);
+    patchLevelStr = Tcl_GetVar(interp, "snack::patchLevel", TCL_GLOBAL_ONLY);
     Tcl_Write(snackDebugChannel, "Snack patch level: ", 19);
     if (patchLevelStr != NULL) {
       Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));

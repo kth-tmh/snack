@@ -1811,7 +1811,9 @@ PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
   /* X11 color names can be up to 31 chars; allocate 32 per color plus "\n\0". */
   buffer = (char *) ckalloc((size_t)spegPtr->si.ncolors * 32 + 2);
   for (i = 0; i < spegPtr->si.ncolors; i++) {
-    j += (int) snprintf(&buffer[j], 32, "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
+    j += (int) snprintf(&buffer[j],
+                        (size_t)(spegPtr->si.ncolors * 32 + 2 - j),
+                        "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
   }
   buffer[j]     = '\n';
   buffer[j + 1] = '\0';
