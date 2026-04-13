@@ -38,6 +38,10 @@ int	    debug_level = 0;
 
 void free_dp_f0(void);
 static int check_f0_params(Tcl_Interp *interp, F0_params *par, double sample_freq);
+int init_dp_f0(double freq, F0_params *par, long *buffsize, long *sdstep);
+int dp_f0(float *fdata, int buff_size, int sdstep, double freq,
+          F0_params *par, float **f0p_pt, float **vuvp_pt,
+          float **rms_speech_pt, float **acpkp_pt, int *vecsize, int last_time);
 
 int
 Get_f0(Sound *sound, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
@@ -46,10 +50,9 @@ Get_f0(Sound *sound, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   int done;
   long buff_size, actsize;
   double sf, start_time;
-  F0_params *par, *read_f0_params();
+  F0_params *par;
   float *f0p, *vuvp, *rms_speech, *acpkp;
   int i, vecsize;
-  int init_dp_f0(), dp_f0();
   static int framestep = -1;
   long sdstep = 0, total_samps;
   int ndone = 0;
@@ -1581,10 +1584,9 @@ cGet_f0(Sound *sound, Tcl_Interp *interp, float **outlist, int *length)
   int done;
   long buff_size, actsize;
   double sf, start_time;
-  F0_params *par, *read_f0_params();
+  F0_params *par;
   float *f0p, *vuvp, *rms_speech, *acpkp;
   int i, vecsize;
-  int init_dp_f0(), dp_f0();
   static int framestep = -1;
   long sdstep = 0, total_samps;
   int ndone = 0;
