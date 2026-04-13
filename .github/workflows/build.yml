@@ -67,13 +67,22 @@ jobs:
         working-directory: unix
         run: |
           TCL_TK_PREFIX=$(brew --prefix tcl-tk)
+          TOMMATH_PREFIX=$(brew --prefix libtommath)
+          export CPPFLAGS="-I${TOMMATH_PREFIX}/include"
+          export LDFLAGS="-L${TOMMATH_PREFIX}/lib -Wl,-rpath,${TOMMATH_PREFIX}/lib"
+          export PKG_CONFIG_PATH="${TOMMATH_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
           ./configure \
             --with-tcl="$TCL_TK_PREFIX/lib" \
             --with-tk="$TCL_TK_PREFIX/lib"
 
       - name: Build
         working-directory: unix
-        run: make
+        run: |
+          TOMMATH_PREFIX=$(brew --prefix libtommath)
+          export CPPFLAGS="-I${TOMMATH_PREFIX}/include"
+          export LDFLAGS="-L${TOMMATH_PREFIX}/lib -Wl,-rpath,${TOMMATH_PREFIX}/lib"
+          export PKG_CONFIG_PATH="${TOMMATH_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
+          make
 
       - name: Package
         run: |
