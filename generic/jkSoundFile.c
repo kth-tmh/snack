@@ -523,7 +523,7 @@ ReadSound(readSamplesProc *readProc, Sound *s, Tcl_Interp *interp,
 	tot = 0;
       }
     } else {
-      int length = 0;
+      Tcl_Size length = 0;
       unsigned char *ptr = NULL;
       if (useOldObjAPI) {
 	ptr = (unsigned char *) obj->bytes;
@@ -1322,7 +1322,7 @@ GetRawHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       s->length = (obj->length  - s->skipBytes) / (s->sampsize * s->nchannels);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       s->length = (length - s->skipBytes) / (s->sampsize * s->nchannels);
@@ -1400,7 +1400,7 @@ GetSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       s->length = (obj->length - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       s->length = (length - NIST_HEADERSIZE) / (s->sampsize * s->nchannels);
@@ -1433,16 +1433,15 @@ PutSmpHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     return -1;
   }
 
-  i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i), "file=samp\r\n");
-  i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i), "sftot=%d\r\n", s->samprate);
+  i += (int) sprintf(&buf[i], "file=samp\r\n");
+  i += (int) sprintf(&buf[i], "sftot=%d\r\n", s->samprate);
   if (littleEndian) {
-    i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i), "msb=last\r\n");
+    i += (int) sprintf(&buf[i], "msb=last\r\n");
   } else {
-    i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i), "msb=first\r\n");
+    i += (int) sprintf(&buf[i], "msb=first\r\n");
   }
-  i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i), "nchans=%d\r\n", s->nchannels);
-  i += (int) snprintf(&buf[i], (size_t)(HEADBUF - i),
-                      "preemph=none\r\nborn=snack\r\n=\r\n%c%c%c", 0, 4, 26);
+  i += (int) sprintf(&buf[i], "nchans=%d\r\n", s->nchannels);
+  i += (int) sprintf(&buf[i],"preemph=none\r\nborn=snack\r\n=\r\n%c%c%c", 0,4,26);
 
   for (;i < NIST_HEADERSIZE; i++) buf[i] = 0;
 
@@ -1549,7 +1548,7 @@ GetSdHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       s->length = obj->length / s->sampsize + s->loadOffset;
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       s->length = length / s->sampsize + s->loadOffset;
@@ -1696,7 +1695,7 @@ GetAuHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       nsamp = (obj->length - hlen) / (s->sampsize * s->nchannels);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       nsamp = (length - hlen) / (s->sampsize * s->nchannels);
@@ -1924,7 +1923,7 @@ GetWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       nsampfile = (obj->length - s->headSize) / (s->sampsize * s->nchannels);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       nsampfile = (length - s->headSize) / (s->sampsize * s->nchannels);
@@ -1972,14 +1971,14 @@ PutWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
 {
   char buf[HEADBUF];
 
-  memcpy(&buf[0], "RIFF", 4);
+  sprintf(&buf[0], "RIFF");
   if (len != -1) {
     PutLELong(buf, 4, len * s->sampsize * s->nchannels + 36);
   } else {
     SwapIfBE(s);
     PutLELong(buf, 4, 0x7FFFFFFF);
   }
-  memcpy(&buf[8], "WAVEfmt ", 8);
+  sprintf(&buf[8], "WAVEfmt ");
   PutLELong(buf, 16, 16);
 
   switch (s->encoding) {
@@ -2001,7 +2000,7 @@ PutWavHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   PutLELong(buf, 28, (s->samprate * s->nchannels * s->sampsize * 8 + 7) / 8);
   PutLEShort(buf, 32, (short)((s->nchannels * s->sampsize * 8 + 7) / 8));
   PutLEShort(buf, 34, (short) (s->sampsize * 8));
-  memcpy(&buf[36], "data", 4);
+  sprintf(&buf[36], "data");
   if (len != -1) {
     PutLELong(buf, 40, len * s->sampsize * s->nchannels);
   } else {
@@ -2185,20 +2184,20 @@ PutAiffHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     return -1;
   }
 
-  memcpy(&buf[0], "FORM", 4);
+  sprintf(&buf[0], "FORM");
   if (len != -1) {
     PutBELong(buf, 4, len * s->sampsize * s->nchannels + 46);
   } else {
     SwapIfLE(s);
     PutBELong(buf, 4, 0x7FFFFFFF);
   }
-  memcpy(&buf[8], "AIFFCOMM", 8);
+  sprintf(&buf[8], "AIFFCOMM");
   PutBELong(buf, 16, 18);
   PutBEShort(buf, 20, (short) s->nchannels);
   PutBELong(buf, 22, s->length);
   PutBEShort(buf, 26, (short) (s->sampsize * 8));
   StoreFloat((unsigned char *) &buf[28], (int32_t) s->samprate);
-  memcpy(&buf[38], "SSND", 4);
+  sprintf(&buf[38], "SSND");
   if (len != -1) {
     PutBELong(buf, 42, 8 + s->length * s->sampsize * s->nchannels);
   } else {
@@ -2339,7 +2338,7 @@ GetCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
       nsampfile = (obj->length - s->headSize) / (s->sampsize * s->nchannels);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       Tcl_GetByteArrayFromObj(obj, &length);
       nsampfile = (length - s->headSize) / (s->sampsize * s->nchannels);
@@ -2369,19 +2368,18 @@ PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
     return -1;
   }
   
-  memcpy(&buf[0], "FORMDS16", 8);
+  sprintf(&buf[0], "FORMDS16");
   if (len != -1) {
     PutLELong(buf, 8, len * s->sampsize * s->nchannels + 76);
   } else {
     SwapIfBE(s);
     PutLELong(buf, 8, 0);
   }
-  memcpy(&buf[12], "HEDR", 4);
+  sprintf(&buf[12], "HEDR");
   PutLELong(buf, 16, 32);
   Tcl_GlobalEvalObj(s->interp, Tcl_NewStringObj(CSL_DATECOMMAND, -1));
-  /* Use snprintf with %s to avoid format-string injection from Tcl result. */
-  snprintf(&buf[20], (size_t)(HEADBUF - 20), "%s", Tcl_GetStringResult(s->interp));
-
+  sprintf(&buf[20], "%s", Tcl_GetStringResult(s->interp));
+  
   PutLELong(buf, 40, s->samprate);
   PutLELong(buf, 44, s->length);
   PutLEShort(buf, 48, (short) s->abmax);
@@ -2390,15 +2388,15 @@ PutCslHeader(Sound *s, Tcl_Interp *interp, Tcl_Channel ch, Tcl_Obj *obj,
   } else {
     PutLEShort(buf, 50, (short) s->abmax);
   }
-
-  memcpy(&buf[52], "NOTE", 4);
+  
+  sprintf(&buf[52], "NOTE");
   PutLELong(buf, 56, 19);
-  memcpy(&buf[60], "Created by Snack   ", 19);
+  sprintf(&buf[60], "Created by Snack   ");
 
   if (s->nchannels == 1) {
-    memcpy(&buf[80], "SDA_", 4);
+    sprintf(&buf[80], "SDA_");
   } else {
-    memcpy(&buf[80], "SDAB", 4);
+    sprintf(&buf[80], "SDAB");
   }
   if (len != -1) {
     PutLELong(buf, 84, len * s->sampsize * s->nchannels);
@@ -2648,7 +2646,7 @@ readCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
       }
     case BYTEORDER:
       {
-	int length;
+	Tcl_Size length;
 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 
 	if (strncasecmp(str, "littleEndian", length) == 0) {
@@ -2844,7 +2842,7 @@ writeCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       }
     case BYTEORDER:
       {
-	int length;
+	Tcl_Size length;
 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 
 	if (strncasecmp(str, "littleEndian", length) == 0) {
@@ -2914,7 +2912,8 @@ dataCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   if ((objc % 2) == 0) { /* sound -> variable */
     Tcl_Obj *new = Tcl_NewObj();
     char *filetype = s->fileType;
-    int arg, len, startpos = 0, endpos = s->length;
+    int arg, startpos = 0, endpos = s->length;
+    Tcl_Size len;
     static CONST84 char *subOptionStrings[] = {
       "-fileformat", "-start", "-end", "-byteorder",
       NULL
@@ -3039,7 +3038,7 @@ dataCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	}
       case BYTEORDER:
 	{
-	  int length;
+	  Tcl_Size length;
 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 	      
 	  if (strncasecmp(str, "littleEndian", length) == 0) {
@@ -3162,7 +3161,7 @@ GetHeader(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
       memcpy((char *)s->tmpbuf, obj->bytes, len);
     } else {
 #ifdef TCL_81_API
-      int length = 0;
+      Tcl_Size length = 0;
       
       ptr = Tcl_GetByteArrayFromObj(obj, &length);
       len = min(length, buflen);
@@ -3223,7 +3222,7 @@ PutHeader(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[],
 int
 GetFileFormat(Tcl_Interp *interp, Tcl_Obj *obj, char **filetype)
 {
-  int length;
+  Tcl_Size length;
   char *str = Tcl_GetStringFromObj(obj, &length);
   Snack_FileFormat *ff;
 
