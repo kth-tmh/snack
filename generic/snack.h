@@ -48,10 +48,6 @@
 #   define Tcl_Size int
 #endif
 
-#ifndef Tcl_Size
-#   define Tcl_Size int
-#endif
-
 #include "jkSound.h"
 #include "jkAudIO.h"
 

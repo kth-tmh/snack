@@ -20,8 +20,7 @@
  */
 
 #include "tcl.h"
-#include "jkAudIO.h"
-#include "jkSound.h"
+#include "snack.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -48,6 +47,8 @@ static struct MixerLink mixerLinks[SOUND_MIXER_NRDEVICES][2];
 static int littleEndian = 0;
 
 static int minNumChan = 1;
+
+static snd_pcm_uframes_t hw_bufsize = 0;
 
 int
 SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device, int mode, int freq,
@@ -135,6 +136,9 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device, int mode, int freq,
     Tcl_AppendResult(interp, "Failed setting HW params.", NULL);
     return TCL_ERROR;
   }
+
+  snd_pcm_hw_params_get_buffer_size (hw_params, &hw_bufsize);
+
   snd_pcm_hw_params_free(hw_params);
   snd_pcm_prepare(A->handle);
   if (A->mode == RECORD) {
@@ -202,6 +206,8 @@ SnackAudioPost(ADesc *A)
   int i;
   static char buf[64];
 
+  return;
+		
   if (A->debug > 1) Snack_WriteLog("  Enter SnackAudioPost\n");
 
   for (i = 0; i < 1000; i++) {
@@ -267,12 +273,14 @@ SnackAudioWriteable(ADesc *A)
 long
 SnackAudioPlayed(ADesc *A)
 {
-  long avail = _snd_pcm_mmap_hw_ptr(A->handle);
+  // FIX Here, _snd_pcm_mmap_hw_ptr is deprecated in new alsalib
+  long played = A->nWritten - (hw_bufsize - SnackAudioWriteable(A));
+  // long avail = _snd_pcm_mmap_hw_ptr(A->handle);
   
-  if (avail < 0)
-    avail = 0;
+  if (played < 0)
+	return 0;
 
-  return (avail+A->nPlayed);
+  return (played);
 }
 
 void

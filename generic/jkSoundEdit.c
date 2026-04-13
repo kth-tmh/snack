@@ -281,7 +281,8 @@ Snack_GetSoundData(Sound *s, int pos, void *buf, int nSamples)
 int
 lengthCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
-  int arg, len, type = 0, newlen = -1, i;
+  int arg, type = 0, newlen = -1, i;
+  Tcl_Size len;
   char *string = NULL;
 
   if (s->debug > 0) { Snack_WriteLog("Enter lengthCmd\n"); }
@@ -291,6 +292,12 @@ lengthCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       string = Tcl_GetStringFromObj(objv[arg], &len);
       
       if (strncmp(string, "-units", len) == 0) {
+	if (arg + 1 == objc) {
+	  Tcl_AppendResult(interp, "No argument given for ",
+			   string, " option", (char *) NULL);
+	  return TCL_ERROR;
+	}
+    
 	string = Tcl_GetStringFromObj(objv[arg+1], &len);
 	if (strncasecmp(string, "seconds", len) == 0) type = 1;
 	if (strncasecmp(string, "samples", len) == 0) type = 0;
@@ -722,7 +729,8 @@ int
 appendCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
   Sound *t, *dummy;
-  int arg, startpos = 0, endpos = -1, length = 0;
+  int arg, startpos = 0, endpos = -1;
+  Tcl_Size length = 0;
   char *filetype, *str;
   static CONST84 char *subOptionStrings[] = {
     "-rate", "-frequency", "-skiphead", "-byteorder", "-channels",
@@ -787,7 +795,7 @@ appendCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       }
     case BYTEORDER:
       {
-	int length;
+	Tcl_Size length;
 	char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 	    
 	if (strncasecmp(str, "littleEndian", length) == 0) {
@@ -1152,6 +1160,12 @@ convertCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
       return TCL_ERROR;
     }
 
+    if (arg + 1 == objc) {
+      Tcl_AppendResult(interp, "No argument given for ",
+		       subOptionStrings[index], " option", (char *) NULL);
+      return TCL_ERROR;
+    }
+    
     switch ((enum subOptions) index) {
     case RATE:
     case FREQUENCY:
@@ -1516,7 +1530,7 @@ sampleCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     }
     for (n = 3; n < 3 + s->nchannels; n++, i++) {
       char *str;
-      int len;
+      Tcl_Size len;
 
       if (n >= objc) break;
       str = Tcl_GetStringFromObj(objv[n], &len);

@@ -20,8 +20,7 @@
  */
 
 #include "tcl.h"
-#include "jkAudIO.h"
-#include "jkSound.h"
+#include "snack.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -707,7 +706,7 @@ JackVarProc(ClientData clientData, Tcl_Interp *interp, CONST84 char *name1,
   ioctl(mfd, SOUND_MIXER_READ_RECSRC, &recSrc);
 /*printf("JackVarProc %x %s %s\n", recSrc, name1, name2);*/
   if (flags & TCL_TRACE_UNSETS) {
-    if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
+    if ((flags & TCL_TRACE_DESTROYED)) {
       for (i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
 	if (strncasecmp(mixLink->jack, jackLabels[i], strlen(mixLink->jack))
 	    == 0) {
@@ -721,7 +720,7 @@ JackVarProc(ClientData clientData, Tcl_Interp *interp, CONST84 char *name1,
       }
       obj = Tcl_NewIntObj(status);
       var = Tcl_NewStringObj(mixLink->jackVar, -1);
-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
+      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
       Tcl_TraceVar(interp, mixLink->jackVar,
 		   TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		   JackVarProc, mixLink);
@@ -746,7 +745,7 @@ JackVarProc(ClientData clientData, Tcl_Interp *interp, CONST84 char *name1,
       }
       obj = Tcl_NewIntObj(status);
       var = Tcl_NewStringObj(mixerLinks[i][0].jackVar, -1);
-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY |TCL_PARSE_PART1);
+      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
     }
   }
   dontTrace = 0;
@@ -778,7 +777,7 @@ SnackMixerLinkJacks(Tcl_Interp *interp, char *jack, Tcl_Obj *var)
       } else {
 	Tcl_Obj *obj = Tcl_NewIntObj(status);
 	Tcl_ObjSetVar2(interp, var, NULL, obj, 
-		       TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
+		       TCL_GLOBAL_ONLY);
 
       }
       Tcl_TraceVar(interp, mixerLinks[i][0].jackVar,
@@ -878,14 +877,14 @@ VolumeVarProc(ClientData clientData, Tcl_Interp *interp, CONST84 char *name1,
   CONST84 char *stringValue;
   
   if (flags & TCL_TRACE_UNSETS) {
-    if ((flags & TCL_TRACE_DESTROYED) && !(flags & TCL_INTERP_DESTROYED)) {
+    if ((flags & TCL_TRACE_DESTROYED)) {
       Tcl_Obj *obj, *var;
       char tmp[VOLBUFSIZE];
 
       SnackMixerGetVolume(mixLink->mixer, mixLink->channel, tmp, VOLBUFSIZE);
       obj = Tcl_NewIntObj(atoi(tmp));
       var = Tcl_NewStringObj(mixLink->mixerVar, -1);
-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
+      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
       Tcl_TraceVar(interp, mixLink->mixerVar,
 		   TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
 		   VolumeVarProc, mixLink);
@@ -929,7 +928,7 @@ SnackMixerLinkVolume(Tcl_Interp *interp, char *line, int n,
 	  SnackMixerGetVolume(line, channel, tmp, VOLBUFSIZE);
 	  obj = Tcl_NewIntObj(atoi(tmp));
 	  Tcl_ObjSetVar2(interp, objv[j+3], NULL, obj, 
-			 TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
+			 TCL_GLOBAL_ONLY);
 	}
 	Tcl_TraceVar(interp, mixerLinks[i][j].mixerVar,
 		     TCL_GLOBAL_ONLY|TCL_TRACE_WRITES|TCL_TRACE_UNSETS,
@@ -954,7 +953,7 @@ SnackMixerUpdateVars(Tcl_Interp *interp)
 			    tmp, VOLBUFSIZE);
 	obj = Tcl_NewIntObj(atoi(tmp));
 	var = Tcl_NewStringObj(mixerLinks[i][j].mixerVar, -1);
-	Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY|TCL_PARSE_PART1);
+	Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
       }
     }
     if (mixerLinks[i][0].jackVar != NULL) {
@@ -965,7 +964,7 @@ SnackMixerUpdateVars(Tcl_Interp *interp)
       }
       obj = Tcl_NewIntObj(status);
       var = Tcl_NewStringObj(mixerLinks[i][0].jackVar, -1);
-      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY | TCL_PARSE_PART1);
+      Tcl_ObjSetVar2(interp, var, NULL, obj, TCL_GLOBAL_ONLY);
     }
   }
 }

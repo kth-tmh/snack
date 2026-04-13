@@ -498,7 +498,8 @@ char *encs[] = { "", "Lin16", "Alaw", "Mulaw", "Lin8offset", "Lin8",
 int
 GetChannels(Tcl_Interp *interp, Tcl_Obj *obj, int *nchannels)
 {
-  int length, val;
+  Tcl_Size length;
+  int val;
   char *str = Tcl_GetStringFromObj(obj, &length);
 
   if (strncasecmp(str, "MONO", length) == 0) {
@@ -525,7 +526,7 @@ GetChannels(Tcl_Interp *interp, Tcl_Obj *obj, int *nchannels)
 int
 GetEncoding(Tcl_Interp *interp, Tcl_Obj *obj, int *encoding, int *sampsize)
 {
-  int length;
+  Tcl_Size length;
   char *str = Tcl_GetStringFromObj(obj, &length);
 
   if (strncasecmp(str, "LIN16", length) == 0) {
@@ -1088,7 +1089,7 @@ configureCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	}
       case BYTEORDER:
 	{
-	  int length;
+	  Tcl_Size length;
 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 	  if (strncasecmp(str, "littleEndian", length) == 0) {
 	    SwapIfBE(s);
@@ -1127,7 +1128,7 @@ configureCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	}
       case PRECISION:
 	{
-	  int length;
+	  Tcl_Size length;
 	  char *str = Tcl_GetStringFromObj(objv[arg+1], &length);
 	  if (strncasecmp(str, "double", length) == 0) {
 	    s->precision = SNACK_DOUBLE_PREC;
@@ -1681,7 +1682,7 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   char *name;
   Tcl_HashTable *hTab = (Tcl_HashTable *) cdata;
   Tcl_HashEntry *hPtr;
-  int length = 0;
+  Tcl_Size length = 0;
   char *string = NULL;
   Tcl_Obj *cmdPtr = NULL;
   Tcl_Obj *progPtr = NULL;
@@ -2113,7 +2114,7 @@ Snack_AddSubCmd(int snackCmd, char *cmdName, Snack_CmdProc *cmdProc,
 int
 SetFcname(Sound *s, Tcl_Interp *interp, Tcl_Obj *obj)
 {
-  int length;
+  Tcl_Size length;
   char *str = Tcl_GetStringFromObj(obj, &length);
 
   if (s->fcname != NULL) {
