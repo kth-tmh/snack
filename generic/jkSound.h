@@ -603,10 +603,12 @@ extern void Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[],
 
 extern void SnackPauseAudio();
 
-#if TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4
+#if TCL_MAJOR_VERSION >= 9 || (TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4)
+/* Tcl < 8.4 and Tcl 9+: use Tcl_Seek/Tcl_Tell (SeekOld/TellOld removed in 9) */
 #define TCL_SEEK Tcl_Seek
 #define TCL_TELL Tcl_Tell
 #else
+/* Tcl 8.4-8.x: use the int-compatible wrappers */
 #define TCL_SEEK Tcl_SeekOld
 #define TCL_TELL Tcl_TellOld
 #endif
