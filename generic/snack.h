@@ -35,6 +35,12 @@
 #   define CONST84
 #endif
 
+/* _ANSI_ARGS_ was removed from Tcl headers in Tcl 8.5; define it here if
+ * it is not already provided so that snackDecls.h compiles with modern Tcl. */
+#ifndef _ANSI_ARGS_
+#   define _ANSI_ARGS_(x) x
+#endif
+
 #include "jkSound.h"
 #include "jkAudIO.h"
 
