@@ -252,6 +252,7 @@ CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 	   int argc, char **argv)
 {
   SectionItem *sectPtr = (SectionItem *) itemPtr;
+  int i;
 
   if (argc < 2) {
     Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -326,11 +327,16 @@ CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
 
 
-  if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &sectPtr->x) != TCL_OK) ||
-      (Tk_CanvasGetCoord(interp, canvas, argv[1], &sectPtr->y) != TCL_OK))
+  for (i = 1; i < argc; i++) {
+      if ((argv[i][0] == '-') && (argv[i][1] >= 'a') && (argv[i][1] <= 'z')) {
+	  break;
+      }
+  }
+
+  if (SectionCoords(interp, canvas, (Tk_Item*)sectPtr, i, argv) != TCL_OK) {
     return TCL_ERROR;
-  
-  if (ConfigureSection(interp, canvas, itemPtr, argc-2, argv+2, 0) == TCL_OK)
+  }
+  if (ConfigureSection(interp, canvas, itemPtr, argc-i, argv+i, 0) == TCL_OK)
     return TCL_OK;
 
   DeleteSection(canvas, itemPtr, Tk_Display(Tk_CanvasTkwin(canvas)));
@@ -343,26 +349,42 @@ SectionCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 {
   SectionItem *wPtr = (SectionItem *) itemPtr;
   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+  char **oargv = argv;
+  int result = TCL_OK;
 
   if (argc == 0) {
     Tcl_PrintDouble(interp, wPtr->x, xc);
     Tcl_PrintDouble(interp, wPtr->y, yc);
     Tcl_AppendResult(interp, xc, " ", yc, (char *) NULL);
-  } else if (argc == 2) {
+    return TCL_OK;
+  }
+  
+  if (argc == 1) {
+      if (Tcl_SplitList(interp, argv[0], &argc, &argv) != TCL_OK) {
+	  return TCL_ERROR;
+      }
+  }
+
+  if (argc == 2) {
     if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
 	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+    } else {
+      ComputeSectionBbox(canvas, wPtr);
     }
-    ComputeSectionBbox(canvas, wPtr);
   } else {
     char buf[80];
 
     sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
-    return TCL_ERROR;
+    result = TCL_ERROR;
   }
-  return TCL_OK;
+done:
+  if (oargv != argv) {
+      ckfree( (char*)argv);
+  }
+  return result;
 }
 
 static int

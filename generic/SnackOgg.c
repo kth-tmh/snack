@@ -37,7 +37,7 @@ DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)
  ********************************************************************
 
  function: stdio-based convenience library for opening/seeking/decoding
- last mod: $Id: vorbisfile.h,v 1.17 2002/03/07 03:41:03 xiphmont Exp $
+ last mod: $Id: SnackOgg.c,v 1.1 2009/06/06 14:22:20 pcmacdon Exp $
 
  ********************************************************************/
 
@@ -185,7 +185,7 @@ extern long ov_read(OggVorbis_File *vf,char *buffer,int length,
  ********************************************************************
 
  function: stdio-based convenience library for opening/seeking/decoding
- last mod: $Id: vorbisfile.c,v 1.62 2002/07/06 04:20:03 msmith Exp $
+ last mod: $Id: SnackOgg.c,v 1.1 2009/06/06 14:22:20 pcmacdon Exp $
 
  ********************************************************************/
 

@@ -41,6 +41,7 @@ extern struct jkQueuedSound *rsoundQueue;
 
 double globalLatency = BUFSECS;
 float globalScaling = 1.0f;
+int failRate = 48000;
 
 char defaultOutDevice[MAX_DEVICE_NAME_LENGTH];
 char defaultInDevice[MAX_DEVICE_NAME_LENGTH];
@@ -305,6 +306,25 @@ scalingCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 }
 
 static int
+failrateCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
+{
+  int d = -1;
+
+  if (objc == 2) {
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(failRate));
+  } else if (objc == 3) {
+    if (Tcl_GetIntFromObj(interp, objv[2], &d) != TCL_OK) {
+      return TCL_ERROR;
+    }
+    globalScaling = d;
+  } else {
+    Tcl_WrongNumArgs(interp, 1, objv, "altrate ?factor?");
+    return TCL_ERROR;
+  }
+  return TCL_OK;
+}
+
+static int
 audioPlayCmd(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
   if (rop == PAUSED || wop == PAUSED) {
@@ -372,6 +392,7 @@ CONST84 char *audioCmdNames[MAXAUDIOCOMMANDS] = {
   "play",
   "stop",
   "pause",
+  "fallbackrate",
   NULL
 };
 
@@ -395,10 +416,12 @@ audioCmd *audioCmdProcs[MAXAUDIOCOMMANDS] = {
   ratesCmd,
   audioPlayCmd,
   audioStopCmd,
-  audioPauseCmd
+  audioPauseCmd,
+  failrateCmd
 };
 
 audioDelCmd *audioDelCmdProcs[MAXAUDIOCOMMANDS] = {
+  NULL,
   NULL,
   NULL,
   NULL,

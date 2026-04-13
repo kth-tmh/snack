@@ -1,6 +1,6 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.4 "$0" "$@"
+exec wish8.5 "$0" "$@"
 # derived from Snack snamp.tcl demo player by Tom Wilkason
 #
 global taFiles tomAmp
@@ -467,7 +467,7 @@ proc MonitorFolders {args} {
 ;#
 proc readSettings {args} {
    global tomAmpSettings tomAmp
-   set tomAmpSettings(mediaDirs) ~
+   set tomAmpSettings(mediaDirs) ~/mp3
    set tomAmpSettings(randomPlay) 0
    set tomAmpSettings(ContinuousPlay) 1
    set tomAmpSettings(AutoRescan) 0

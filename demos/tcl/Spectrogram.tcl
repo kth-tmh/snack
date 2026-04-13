@@ -1,6 +1,6 @@
 #!/bin/sh
 # the next line restarts using wish \
-exec wish8.4 "$0" "$@"
+exec wish8.5 "$0" "$@"
 
 package require -exact snack 2.2
 
@@ -20,7 +20,7 @@ set color Red
 set type Hamming
 option add *font {Helvetica 10 bold}
 
-pack [ canvas .c -width 600 -height 300]
+pack [ canvas .c -bg lightblue -width 600 -height 300]
 pack [ label .l -text "Drag spectrogram with left mouse button"]
 pack [ frame .f1] -pady 2
 pack [ scale .f1.s1 -variable width -label Width -from 10 -to 600 -orient hori\

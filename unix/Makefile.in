@@ -296,11 +296,20 @@ libsnacksphere${SHLIB_SUFFIX}: ${OBJNIST}
 LIBOGG = @OGGLIBS@ -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
 OBJOGG = SnackOgg.o
 
+LIBMP3 = -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
+OBJMP3 = SnackMP3.o
+
 SnackOgg.o: $(GENERIC_DIR)/SnackOgg.c
 	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS $(GENERIC_DIR)/SnackOgg.c
 
 libsnackogg${SHLIB_SUFFIX}: ${OBJOGG}
 	${SHLIB_LD} ${OBJOGG} ${LIBOGG} -o libsnackogg${SHLIB_SUFFIX}
+
+SnackMP3.o: $(GENERIC_DIR)/jkFormatMP3.c
+	$(CC) -I /home/pcmacdon/src/wize/unix/usr/include -c -o SnackMP3.o $(CFLAGS) -DUSE_SNACK_STUBS $(GENERIC_DIR)/jkFormatMP3.c
+
+libsnackmpg${SHLIB_SUFFIX}: ${OBJMP3}
+	${SHLIB_LD} ${OBJMP3} ${LIBMP3} -o libsnackmpg${SHLIB_SUFFIX}
 
 install:
 	@if [ ! -d ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION} ] ; then \

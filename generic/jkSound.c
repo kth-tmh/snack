@@ -1684,16 +1684,17 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   int length = 0;
   char *string = NULL;
   Tcl_Obj *cmdPtr = NULL;
+  Tcl_Obj *progPtr = NULL;
   static CONST84 char *optionStrings[] = {
     "-load", "-file", "-rate", "-frequency", "-channels", "-encoding",
     "-format", "-channel", "-byteorder", "-buffersize", "-skiphead",
     "-guessproperties", "-fileformat", "-precision", "-changecommand",
-    "-debug", NULL
+    "-debug", "-progress", NULL
   };
   enum options {
     OPTLOAD, OPTFILE, RATE, FREQUENCY, CHANNELS, ENCODING, FORMAT, CHANNEL,
     BYTEORDER, BUFFERSIZE, SKIPHEAD, GUESSPROPS, FILEFORMAT, 
-    PRECISION, CHGCMD, OPTDEBUG
+    PRECISION, CHGCMD, OPTDEBUG, PROGRESS
   };
 
   if (objc > 1) {
@@ -1866,6 +1867,16 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
 	}
 	break;
       }
+    case PROGRESS:
+      {
+	char *str = Tcl_GetStringFromObj(objv[arg+1], NULL);
+
+	if (strlen(str) > 0) {
+	  progPtr = Tcl_DuplicateObj(objv[arg+1]);
+	  Tcl_IncrRefCount(progPtr);
+	}
+	break;
+      }
     }
   }
   
@@ -1877,6 +1888,7 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   hPtr = Tcl_CreateHashEntry(hTab, name, &flag);
   Tcl_SetHashValue(hPtr, (ClientData) s);
   s->soundTable = hTab;
+
 
   if (guessProps) {
     if (guessEncoding == -1) {
@@ -1917,6 +1929,9 @@ ParseSoundCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     s->changeCmdPtr = cmdPtr;
   }
 
+  if (progPtr != NULL) {
+    s->cmdPtr = progPtr;
+  }
   /*  s->fcname = strdup(name); */
   s->interp = interp;
   
