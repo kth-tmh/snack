@@ -38,11 +38,11 @@
 
 #ifndef Solaris
 #  ifndef TkPutImage
-EXTERN void TkPutImage _ANSI_ARGS_((unsigned long *colors,
-				    int ncolors, Display* display, Drawable d,
-				    GC gc, XImage* image, int src_x, int src_y,
-				    int dest_x, int dest_y, unsigned int width,
-				    unsigned int height));
+EXTERN void TkPutImage(unsigned long *colors,
+		       int ncolors, Display* display, Drawable d,
+		       GC gc, XImage* image, int src_x, int src_y,
+		       int dest_x, int dest_y, unsigned int width,
+		       unsigned int height);
 #  endif
 #endif
 
@@ -89,12 +89,12 @@ typedef struct SpectrogramItem  {
 float xfft[NMAX];
 
 static int ParseColorMap(ClientData clientData, Tcl_Interp *interp,
-			 Tk_Window tkwin, CONST84 char *value, char *recordPtr,
-			 int offset);
+			 Tk_Window tkwin, const char *value, char *recordPtr,
+			 Tcl_Size offset);
 
-static char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
-			   char *recordPtr, int offset,
-			   Tcl_FreeProc **freeProcPtr);
+static const char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
+				 char *recordPtr, Tcl_Size offset,
+				 Tcl_FreeProc **freeProcPtr);
 
 Tk_CustomOption spegTagsOption = { (Tk_OptionParseProc *) NULL,
 				   (Tk_OptionPrintProc *) NULL,
@@ -1705,11 +1705,11 @@ DrawSpeg(SnackItemInfo *siPtr, Display* disp, GC gc, int width, int height,
 
 static int
 ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
-	      CONST84 char *value, char *recordPtr, int offset)
+	      const char *value, char *recordPtr, Tcl_Size offset)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
   int argc, i;
-  CONST84 char **argv = NULL;
+  const char **argv = NULL;
 
   if (Tcl_SplitList(interp, value, &argc, &argv) != TCL_OK) {
     Tcl_ResetResult(interp);
@@ -1797,9 +1797,9 @@ ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
   return TCL_OK;
 }
 
-static char*
+static const char *
 PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
-	      int offset, Tcl_FreeProc **freeProcPtr)
+	      Tcl_Size offset, Tcl_FreeProc **freeProcPtr)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
   char *buffer;

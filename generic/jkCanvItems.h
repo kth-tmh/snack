@@ -23,6 +23,12 @@
 extern "C" {
 #endif
 
+/* Tk_Offset was removed in Tk 9; provide a compat definition using offsetof */
+#ifndef Tk_Offset
+#  include <stddef.h>
+#  define Tk_Offset(type, field) ((int) offsetof(type, field))
+#endif
+
 #define NDEFCOLS 256
 #define FRAMESIZE 262144
 

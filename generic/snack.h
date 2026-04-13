@@ -32,7 +32,12 @@
 #endif
 
 #ifndef CONST84
-#   define CONST84
+#   define CONST84 const
+#endif
+
+/* Tcl_Size was introduced in Tcl/Tk 8.7; define it for older versions */
+#ifndef Tcl_Size
+#   define Tcl_Size int
 #endif
 
 
