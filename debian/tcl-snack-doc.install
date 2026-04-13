@@ -1,5 +1,0 @@
-README                  usr/share/doc/tcl-snack-doc
-debian/README.Debian    usr/share/doc/tcl-snack-doc
-doc/*			usr/share/doc/tcl-snack-doc/html
-demos/python/*		usr/share/doc/tcl-snack-doc/examples/python
-debian/tmp/tcl/*	usr/share/doc/tcl-snack-doc/examples/tcl
