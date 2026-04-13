@@ -418,7 +418,8 @@ Snack_WriteLogInt(char *str, int num)
   }
   if (snackDebugChannel == NULL) return;
   Tcl_Write(snackDebugChannel, str, strlen(str));
-  snprintf(buf, sizeof(buf), " %d", num);  Tcl_Write(snackDebugChannel, buf, strlen(buf));
+  snprintf(buf, sizeof(buf), " %d", num);
+  Tcl_Write(snackDebugChannel, buf, strlen(buf));
   Tcl_Write(snackDebugChannel, "\n", 1);
   Tcl_Flush(snackDebugChannel);
 }

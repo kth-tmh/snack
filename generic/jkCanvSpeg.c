@@ -1805,17 +1805,27 @@ PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
   char *buffer;
-  int i, j = 0;
+  size_t total, written, remaining;
+  int i, n;
 
   *freeProcPtr = TCL_DYNAMIC;
   /* X11 color names can be up to 31 chars; allocate 32 per color plus "\n\0". */
-  buffer = (char *) ckalloc((size_t)spegPtr->si.ncolors * 32 + 2);
+  total = (size_t)spegPtr->si.ncolors * 32 + 2;
+  buffer = (char *) ckalloc(total);
+  written = 0;
+  remaining = total;
   for (i = 0; i < spegPtr->si.ncolors; i++) {
-    j += (int) snprintf(&buffer[j],
-                        (size_t)(spegPtr->si.ncolors * 32 + 2 - j),
-                        "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
+    n = snprintf(&buffer[written], remaining, "%s ", Tk_NameOfColor(spegPtr->si.xcolor[i]));
+    if (n > 0 && (size_t)n < remaining) {
+      written += (size_t)n;
+      remaining -= (size_t)n;
+    }
   }
-  buffer[j]     = '\n';
-  buffer[j + 1] = '\0';
+  if (remaining >= 2) {
+    buffer[written]     = '\n';
+    buffer[written + 1] = '\0';
+  } else if (remaining == 1) {
+    buffer[written] = '\0';
+  }
   return buffer;
 }
