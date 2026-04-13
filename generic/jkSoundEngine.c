@@ -1277,10 +1277,12 @@ playCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
   }
   if (snackDumpFile) {
     snackDumpCh = Tcl_OpenFileChannel(interp, snackDumpFile, "w", 438);
-    Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
+    if (snackDumpCh != NULL) {
+      Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
 #ifdef TCL_81_API
-    Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
+      Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
 #endif
+    }
   }
   globalRate = rate;
   globalOutWidth = devChannels;
