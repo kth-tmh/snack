@@ -172,7 +172,11 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
   if (debugLevel > 0) {
     patchLevelStr = Tcl_GetVar(interp, "snack::patchLevel", TCL_GLOBAL_ONLY);
     Tcl_Write(snackDebugChannel, "Snack patch level: ", 19);
-    Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
+    if (patchLevelStr != NULL) {
+      Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
+    } else {
+      Tcl_Write(snackDebugChannel, "unknown", 7);
+    }
     Tcl_Write(snackDebugChannel, "\n", 1);
     Tcl_Flush(snackDebugChannel);
   }
@@ -241,7 +245,7 @@ Snack_Init(Tcl_Interp *interp)
   version = Tcl_GetVar(interp, "tcl_version",
 		       (TCL_GLOBAL_ONLY | TCL_LEAVE_ERR_MSG));
   
-  if (strcmp(version, "8.0") == 0) {
+  if (version != NULL && strcmp(version, "8.0") == 0) {
     useOldObjAPI = 1;
   }
 
@@ -400,6 +404,7 @@ Snack_WriteLog(char *str)
     snackDebugChannel = Tcl_OpenFileChannel(debugInterp, "_debug.txt", "w",
 					    420);
   }
+  if (snackDebugChannel == NULL) return;
   Tcl_Write(snackDebugChannel, str, strlen(str));
   Tcl_Flush(snackDebugChannel);
 }
@@ -413,6 +418,7 @@ Snack_WriteLogInt(char *str, int num)
     snackDebugChannel = Tcl_OpenFileChannel(debugInterp, "_debug.txt", "w",
 					    420);
   }
+  if (snackDebugChannel == NULL) return;
   Tcl_Write(snackDebugChannel, str, strlen(str));
   snprintf(buf, sizeof(buf), " %d", num);
   Tcl_Write(snackDebugChannel, buf, strlen(buf));

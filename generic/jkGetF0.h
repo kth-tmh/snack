@@ -57,11 +57,6 @@ int   n_cands,		/* max. # of F0 cands. to consider at each frame */
 #define F0_PC_AR	0x08		/* inf_order-order LPC inverse filter */
 #define F0_PC_DIFF	0x010		/* 1st-order difference */
 
-extern F0_params *new_f0_params();
-extern int atoi(), eround(), lpc(), window(), get_window();
-extern void get_fast_cands(), a_to_aca(), cross(), crossf(), crossfi(),
-           autoc(), durbin();
-
 #define Fprintf (void)fprintf
 
 /* f0_structs.h */
@@ -97,7 +92,6 @@ typedef struct sta_rec {  /* for stationarity measure */
   float *rms_ratio;
 } Stat;
 
-
 typedef struct frame_rec{
   Cross *cp;
   Dprec *dp;
@@ -106,4 +100,24 @@ typedef struct frame_rec{
   struct frame_rec *prev;
 } Frame;
 
-extern   Frame *alloc_frame();
+extern F0_params *new_f0_params(void);
+extern int eround(double x);
+extern int window(float *din, float *dout, int n, float preemp, int type);
+extern int get_window(float *dout, int n, int type);
+extern void get_fast_cands(float *fdata, float *fdsdata, int ind, int step,
+                           int size, int dec, int start, int nlags,
+                           float *engref, int *maxloc, float *maxval,
+                           Cross *cp, float *peaks, int *locs,
+                           int *ncand, F0_params *par);
+extern void crossf(float *data, int size, int start, int nlags,
+                   float *engref, int *maxloc, float *maxval, float *correl);
+extern void crossfi(float *data, int size, int start0, int nlags0, int nlags,
+                    float *engref, int *maxloc, float *maxval, float *correl,
+                    int *locs, int nlocs);
+extern int  xlpc(int lpc_ord, float lpc_stabl, int wsize, float *data,
+                 float *lpca, float *ar, float *lpck, float *normerr,
+                 float *rms, float preemp, int type);
+extern float wind_energy(float *data, int size, int w_type);
+extern void xa_to_aca(float *a, float *b, float *c, int p);
+extern float xitakura(int p, float *b, float *c, float *r, float *gain);
+extern Frame *alloc_frame(int nlags, int ncands);

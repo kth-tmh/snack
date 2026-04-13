@@ -23,6 +23,12 @@
 extern "C" {
 #endif
 
+/* Tk_Offset was removed in Tk 9; provide a compat definition using offsetof */
+#ifndef Tk_Offset
+#  include <stddef.h>
+#  define Tk_Offset(type, field) ((int) offsetof(type, field))
+#endif
+
 #define NDEFCOLS 256
 #define FRAMESIZE 262144
 
@@ -106,6 +112,13 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #  define hypot hypotd
 
   extern double hypot(double x, double y);
+#endif
+
+/* TK_CONFIG_OPTION_SPECIFIED was removed in Tk 9; the bit value (0x4) is
+ * preserved here so that specFlags-based tracking of which options were
+ * explicitly set continues to work. */
+#ifndef TK_CONFIG_OPTION_SPECIFIED
+#   define TK_CONFIG_OPTION_SPECIFIED 0x4
 #endif
 
 #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)

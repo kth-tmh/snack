@@ -26,9 +26,20 @@
 # define TCL_STORAGE_CLASS DLLEXPORT
 #endif
 
-#ifndef CONST84
-#   define CONST84
+/* Tcl 9 removed CONST; older Snack code still uses it in APIs like Tcl_Obj *CONST objv[] */
+#ifndef CONST
+#  define CONST const
 #endif
+
+#ifndef CONST84
+#   define CONST84 const
+#endif
+
+/* Tcl_Size was introduced in Tcl/Tk 8.7; define it for older versions */
+#ifndef Tcl_Size
+#   define Tcl_Size int
+#endif
+
 
 #include "jkSound.h"
 #include "jkAudIO.h"

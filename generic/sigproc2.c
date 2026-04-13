@@ -468,6 +468,7 @@ void hnwindow(din, dout, n, preemp)
 int get_window(dout, n, type)
      register double *dout;
      register int n;
+     int type;
 {
   static short *din = NULL;
   static int n0 = 0;
@@ -509,6 +510,7 @@ int get_window(dout, n, type)
 int get_float_window(fout, n, type)
      register float *fout;
      register int n;
+     int type;
 {
   static int n0 = 0;
   static double *dout = NULL;
@@ -537,6 +539,7 @@ int fwindow(din, dout, n, preemp, type)
      register short *din;
      register float *dout, preemp;
      register int n;
+     int type;
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -576,6 +579,7 @@ int fwindow_f(din, dout, n, preemp, type)
      register float *din;
      register float *dout, preemp;
      register int n;
+     int type;
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -615,6 +619,7 @@ int fwindow_d(din, dout, n, preemp, type)
      register double *din;
      register double *dout, preemp;
      register int n;
+     int type;
 {
   static float *fwind=NULL;
   static int size=0, otype= (-100);
@@ -655,6 +660,7 @@ void w_window(din, dout, n, preemp, type)
      register short *din;
      register double *dout, preemp;
      register int n;
+     int type;
 {
   switch(type) {
   case 0:

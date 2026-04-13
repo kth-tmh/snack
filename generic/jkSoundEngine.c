@@ -709,8 +709,8 @@ Snack_StopSound(Sound *s, Tcl_Interp *interp)
     /* In-memory sound record */
 
     if ((rop == READ || rop == PAUSED) && (s->readStatus == READ)) {
-      for (p = rsoundQueue; p->sound != s; p = p->next);
-      if (p->sound == s) {
+      for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+      if (p != NULL && p->sound == s) {
 	if (p->next != NULL) {
 	  p->next->prev = p->prev;
 	}
@@ -796,8 +796,8 @@ Snack_StopSound(Sound *s, Tcl_Interp *interp)
 
     if ((rop == READ || rop == PAUSED) && (s->readStatus == READ)) {
       Snack_FileFormat *ff;
-      for (p = rsoundQueue; p->sound != s; p = p->next);
-      if (p->sound == s) {
+      for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+      if (p != NULL && p->sound == s) {
 	if (p->next != NULL) {
 	  p->next->prev = p->prev;
 	}
@@ -1277,10 +1277,12 @@ playCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
   }
   if (snackDumpFile) {
     snackDumpCh = Tcl_OpenFileChannel(interp, snackDumpFile, "w", 438);
-    Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
+    if (snackDumpCh != NULL) {
+      Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
 #ifdef TCL_81_API
-    Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
+      Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
 #endif
+    }
   }
   globalRate = rate;
   globalOutWidth = devChannels;
@@ -1606,7 +1608,7 @@ pauseCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     int hw = 1;
 
     for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
-    if (p->sound == s) {
+    if (p != NULL && p->sound == s) {
       if (p->status == SNACK_QS_QUEUED) {
 	p->status = SNACK_QS_PAUSED;
       } else if (p->status == SNACK_QS_PAUSED) {
@@ -1657,8 +1659,8 @@ pauseCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	s->readStatus = READ;
 	Tcl_DeleteTimerHandler(rtoken);
       } else if (rop == PAUSED) {
-	for (p = rsoundQueue; p->sound != s; p = p->next);
-	if (p->sound == s) {
+	for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+	if (p != NULL && p->sound == s) {
 	  p->status = SNACK_QS_QUEUED;
 	}
 	
@@ -1694,7 +1696,7 @@ current_positionCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[
 
   if (soundQueue != NULL) {
     for (p = soundQueue; p != NULL && p->sound != s; p = p->next);
-    if (p->sound == s) {
+    if (p != NULL && p->sound == s) {
       n = p->startPos + p->nWritten;
     }
   }

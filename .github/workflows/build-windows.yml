@@ -2,13 +2,16 @@ name: Build (Windows)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   build-windows-mingw:
     runs-on: windows-latest
+    permissions:
+      contents: read
     defaults:
       run:
         shell: msys2 {0}
@@ -45,12 +48,10 @@ jobs:
 
   build-windows-msvc:
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Tcl/Tk
-        run: choco install activeperl --no-progress -y
-        continue-on-error: true
 
       - name: Install Tcl via winget
         run: |
