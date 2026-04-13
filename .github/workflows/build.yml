@@ -22,10 +22,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tcl-dev tk-dev libasound2-dev
+          sudo apt-get install -y build-essential gcc g++ tcl-dev tk-dev libasound2-dev
 
       - name: Configure
         working-directory: unix
+        env:
+          CC: gcc
+          CXX: g++
         run: |
           TCL_DIR=$(find /usr -name tclConfig.sh 2>/dev/null | head -1 | xargs dirname)
           TK_DIR=$(find /usr -name tkConfig.sh 2>/dev/null | head -1 | xargs dirname)
