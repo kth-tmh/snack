@@ -116,9 +116,14 @@ jobs:
       - name: Install build tools
         run: pip install build
 
-      - name: Build wheel and sdist
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tcl-dev libasound2-dev
+
+      - name: Build wheel
         working-directory: python
-        run: python -m build
+        run: python -m build --wheel
 
       - uses: actions/upload-artifact@v4
         with:

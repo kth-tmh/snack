@@ -13,10 +13,10 @@ import subprocess
 import sys
 from setuptools import Extension, setup
 
-GENERIC = os.path.join(os.path.dirname(__file__), "..", "generic")
-UNIX    = os.path.join(os.path.dirname(__file__), "..", "unix")
-MAC     = os.path.join(os.path.dirname(__file__), "..", "mac")
-WIN     = os.path.join(os.path.dirname(__file__), "..", "win")
+GENERIC = os.path.join("..", "generic")
+UNIX    = os.path.join("..", "unix")
+MAC     = os.path.join("..", "mac")
+WIN     = os.path.join("..", "win")
 
 
 def _run(*cmd, **kw):
@@ -134,42 +134,55 @@ def platform_audio():
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
 
-tcl_inc, tcl_lib, tcl_libname = find_tcl()
-audio_src, audio_defines, audio_libs, audio_link = platform_audio()
+try:
+    tcl_inc, tcl_lib, tcl_libname = find_tcl()
+    audio_src, audio_defines, audio_libs, audio_link = platform_audio()
 
-sources = [
-    "snack/_snack.c",
-    os.path.join(GENERIC, "sound.c"),
-    os.path.join(GENERIC, "jkSound.c"),
-    os.path.join(GENERIC, "jkSoundEngine.c"),
-    os.path.join(GENERIC, "jkSoundEdit.c"),
-    os.path.join(GENERIC, "jkSoundFile.c"),
-    os.path.join(GENERIC, "jkSoundProc.c"),
-    os.path.join(GENERIC, "ffa.c"),
-    os.path.join(GENERIC, "jkPitchCmd.c"),
-    os.path.join(GENERIC, "jkAudio.c"),
-    os.path.join(GENERIC, "jkMixer.c"),
-    os.path.join(GENERIC, "shape.c"),
-    os.path.join(GENERIC, "jkFilter.c"),
-    os.path.join(GENERIC, "jkSynthesis.c"),
-    os.path.join(GENERIC, "jkFilterIIR.c"),
-    os.path.join(GENERIC, "jkGetF0.c"),
-    os.path.join(GENERIC, "sigproc.c"),
-    os.path.join(GENERIC, "jkFormant.c"),
-    os.path.join(GENERIC, "sigproc2.c"),
-    os.path.join(GENERIC, "g711.c"),
-    os.path.join(GENERIC, "snackStubInit.c"),
-    audio_src,
-]
+    sources = [
+        "snack/_snack.c",
+        os.path.join(GENERIC, "sound.c"),
+        os.path.join(GENERIC, "jkSound.c"),
+        os.path.join(GENERIC, "jkSoundEngine.c"),
+        os.path.join(GENERIC, "jkSoundEdit.c"),
+        os.path.join(GENERIC, "jkSoundFile.c"),
+        os.path.join(GENERIC, "jkSoundProc.c"),
+        os.path.join(GENERIC, "ffa.c"),
+        os.path.join(GENERIC, "jkPitchCmd.c"),
+        os.path.join(GENERIC, "jkAudio.c"),
+        os.path.join(GENERIC, "jkMixer.c"),
+        os.path.join(GENERIC, "shape.c"),
+        os.path.join(GENERIC, "jkFilter.c"),
+        os.path.join(GENERIC, "jkSynthesis.c"),
+        os.path.join(GENERIC, "jkFilterIIR.c"),
+        os.path.join(GENERIC, "jkGetF0.c"),
+        os.path.join(GENERIC, "sigproc.c"),
+        os.path.join(GENERIC, "jkFormant.c"),
+        os.path.join(GENERIC, "sigproc2.c"),
+        os.path.join(GENERIC, "g711.c"),
+        os.path.join(GENERIC, "snackStubInit.c"),
+        audio_src,
+    ]
 
-ext = Extension(
-    "snack._snack",
-    sources=sources,
-    include_dirs=[tcl_inc, GENERIC],
-    library_dirs=[tcl_lib],
-    libraries=[tcl_libname] + audio_libs,
-    define_macros=[(d, None) for d in audio_defines] + [("TCL_81_API", None)],
-    extra_link_args=audio_link,
-)
+    ext = Extension(
+        "snack._snack",
+        sources=sources,
+        include_dirs=[tcl_inc, GENERIC],
+        library_dirs=[tcl_lib],
+        libraries=[tcl_libname] + audio_libs,
+        define_macros=[(d, None) for d in audio_defines] + [("TCL_81_API", None)],
+        extra_link_args=audio_link,
+    )
 
-setup(ext_modules=[ext])
+    ext_modules = [ext]
+
+except RuntimeError as _e:
+    import warnings
+    warnings.warn(
+        f"Snack C extension will not be built: {_e}\n"
+        "Install tcl-dev + libasound2-dev (Linux), tcl-tk (Homebrew), or set\n"
+        "TCL_INCLUDE_DIR and TCL_LIB_DIR, then rebuild.",
+        stacklevel=2,
+    )
+    ext_modules = []
+
+setup(ext_modules=ext_modules)
