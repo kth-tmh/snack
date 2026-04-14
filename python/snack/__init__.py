@@ -16,14 +16,35 @@ Quick start::
     s.play()
 
     pitch = s.pitch()
+    formants = s.formant()          # list of [f1, f2, f3, ...] per frame
     spectrum = s.power_spectrum(fft_length=1024)
+
+Filters::
+
+    from snack import Sound, Filter
+
+    filt = Filter("iir", ...)
+    s = Sound()
+    s.read("speech.wav")
+    s.apply_filter(filt)
 """
 
 from ._snack import (
     Sound,
+    Filter,
     get_output_devices,
     get_input_devices,
-    audio_rate,
+    audio_select_output,
+    audio_select_input,
+    audio_frequencies,
+    audio_encodings,
+    audio_play,
+    audio_stop,
+    audio_pause,
+    audio_elapsed_time,
+    audio_play_gain,
+    audio_record_gain,
+    audio_play_latency,
     LIN16,
     ALAW,
     MULAW,
@@ -37,9 +58,20 @@ from ._snack import (
 
 __all__ = [
     "Sound",
+    "Filter",
     "get_output_devices",
     "get_input_devices",
-    "audio_rate",
+    "audio_select_output",
+    "audio_select_input",
+    "audio_frequencies",
+    "audio_encodings",
+    "audio_play",
+    "audio_stop",
+    "audio_pause",
+    "audio_elapsed_time",
+    "audio_play_gain",
+    "audio_record_gain",
+    "audio_play_latency",
     "LIN16",
     "ALAW",
     "MULAW",

@@ -35,9 +35,12 @@ def find_tcl():
     env_inc = os.environ.get("TCL_INCLUDE_DIR")
     env_lib = os.environ.get("TCL_LIB_DIR")
     if env_inc and env_lib:
-        # Guess lib name from dir contents
+        # Pick the first lib name whose shared library exists in the lib dir.
         for name in ("tcl8.6", "tcl86", "tcl8.5", "tcl"):
-            return env_inc, env_lib, name
+            libfile = os.path.join(env_lib, f"lib{name}.so")
+            libfile_a = os.path.join(env_lib, f"lib{name}.a")
+            if os.path.isfile(libfile) or os.path.isfile(libfile_a):
+                return env_inc, env_lib, name
         return env_inc, env_lib, "tcl"
 
     # 2. pkg-config
