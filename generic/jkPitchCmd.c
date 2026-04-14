@@ -850,7 +850,7 @@ pitchCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 
   for (arg = 2; arg < objc; arg += 2) {
     char *opt = Tcl_GetStringFromObj(objv[arg], NULL);
-    char *val = Tcl_GetStringFromObj(objv[arg+1], NULL);
+    char *val = (arg + 1 == objc) ? "" : Tcl_GetStringFromObj(objv[arg+1], NULL);
 
     if ((strcmp("-method", opt) == 0) && (strcasecmp("esps", val) == 0)) {
       Get_f0(s, interp, objc, objv);

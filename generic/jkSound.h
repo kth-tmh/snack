@@ -130,6 +130,7 @@ typedef struct Sound {
   Tcl_Obj *changeCmdPtr;
   unsigned int userFlag; /* User flags, for new file formats, etc */
   char *userData;        /* User data pointer */
+  int    globalRate;
 
 } Sound;
 
@@ -603,12 +604,9 @@ extern void Snack_RemoveOptions(int objc, Tcl_Obj *CONST objv[],
 
 extern void SnackPauseAudio();
 
-#if TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4
+#if 1 || TCL_MAJOR_VERSION == 8 && TCL_MINOR_VERSION < 4
 #define TCL_SEEK Tcl_Seek
 #define TCL_TELL Tcl_Tell
-#else
-#define TCL_SEEK Tcl_SeekOld
-#define TCL_TELL Tcl_TellOld
 #endif
 
 #define SNACK_DB 4.34294481903251830000000 /*  = 10 / ln(10)  */

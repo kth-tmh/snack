@@ -27,7 +27,25 @@
 #endif
 
 #ifndef CONST84
-#   define CONST84
+#   define CONST84 const
+#endif
+
+#ifndef CONST86
+#   define CONST86 const
+#endif
+
+#ifndef CONST
+#   define CONST const
+#endif
+
+#define _ANSI_ARGS_(x) x
+
+#ifndef Tk_Offset
+#   define Tk_Offset(x,y) offsetof(x,y)
+#endif
+
+#ifndef TCL_SIZE_MAX
+#   define Tcl_Size int
 #endif
 
 #include "jkSound.h"

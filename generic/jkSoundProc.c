@@ -62,7 +62,7 @@ int
 CheckFFTlen(Tcl_Interp *interp, int fftlen)
 {
   int n = NMIN;
-  char str[10];
+  char str[16];
 
   while (n <= NMAX) {
     if (n == fftlen) return TCL_OK;
@@ -82,7 +82,7 @@ CheckFFTlen(Tcl_Interp *interp, int fftlen)
 int
 CheckWinlen(Tcl_Interp *interp, int winlen, int fftlen)
 {
-  char str[10];
+  char str[16];
 
   if (winlen < 1) {
     Tcl_AppendResult(interp, "-winlength must be > 0", NULL);
@@ -284,7 +284,7 @@ dBPowerSpectrumCmd(Sound *s, Tcl_Interp *interp, int objc,
       }
     case ANATYPE:
       {
-	int len;
+	Tcl_Size len;
  	char *str = Tcl_GetStringFromObj(objv[arg+1], &len);
 	
 	if (strncasecmp(str, "lpc", len) == 0) {
@@ -732,7 +732,7 @@ powerSpectrumCmd(Sound *s, Tcl_Interp *interp, int objc,
       }
     case ANATYPE:
       {
-	int len;
+	Tcl_Size len;
  	char *str = Tcl_GetStringFromObj(objv[arg+1], &len);
 	
 	if (strncasecmp(str, "lpc", len) == 0) {
@@ -1869,7 +1869,7 @@ inaCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   float a1[32],a2[32],mn[32];
   int i,j,noli,nofpts=512,shobeg=2,nosing;
   int start;
-  int plLen = 0;
+  Tcl_Size plLen = 0;
   Tcl_Obj** plElems;
   Tcl_Obj *list, *listInv, *listFlow;
 

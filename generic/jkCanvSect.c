@@ -188,11 +188,10 @@ static void   ComputeSectionBbox(Tk_Canvas canvas, SectionItem *sectPtr);
 static int    ComputeSectionCoords(Tk_Item *itemPtr);
 
 static int    ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas,
-			       Tk_Item *itemPtr, int argc,
-			       char **argv, int flags);
+			       Tk_Item *itemPtr, SNACK_CANVAS_CONFIG_ARGS);
 
 static int    CreateSection(Tcl_Interp *interp,	Tk_Canvas canvas,
-			    struct Tk_Item *itemPtr, int argc, char **argv);
+			    struct Tk_Item *itemPtr, SNACK_CANVAS_CREATE_ARGS);
 
 static void   DeleteSection(Tk_Canvas canvas, Tk_Item *itemPtr,
 			    Display *display);
@@ -206,7 +205,7 @@ static void   ScaleSection(Tk_Canvas canvas, Tk_Item *itemPtr,
 			   double scaleX, double scaleY);
 
 static int    SectionCoords(Tcl_Interp *interp,	Tk_Canvas canvas,
-			    Tk_Item *itemPtr, int argc, char **argv);
+			    Tk_Item *itemPtr, SNACK_CANVAS_COORD_ARGS);
 
 static int    SectionToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
 			    double *rectPtr);
@@ -249,9 +248,10 @@ Tk_ItemType snackSectionType = {
 
 static int
 CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-	   int argc, char **argv)
+	   SNACK_CANVAS_CREATE_ARGS)
 {
   SectionItem *sectPtr = (SectionItem *) itemPtr;
+  SNACK_CANVAS_SET_ARGC(objc, argc);
 
   if (argc < 2) {
     Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -326,11 +326,19 @@ CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
 
 
-  if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &sectPtr->x) != TCL_OK) ||
-      (Tk_CanvasGetCoord(interp, canvas, argv[1], &sectPtr->y) != TCL_OK))
+  if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
+			 &sectPtr->x) != TCL_OK) ||
+      (Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
+			 &sectPtr->y) != TCL_OK))
     return TCL_ERROR;
   
-  if (ConfigureSection(interp, canvas, itemPtr, argc-2, argv+2, 0) == TCL_OK)
+  if (ConfigureSection(interp, canvas, itemPtr,
+#if TK_MAJOR_VERSION >= 9
+		       objc - 2, objv + 2,
+#else
+		       argc - 2, argv + 2,
+#endif
+		       0) == TCL_OK)
     return TCL_OK;
 
   DeleteSection(canvas, itemPtr, Tk_Display(Tk_CanvasTkwin(canvas)));
@@ -339,25 +347,28 @@ CreateSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 static int
 SectionCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
-	      int argc, char **argv)
+	      SNACK_CANVAS_COORD_ARGS)
 {
   SectionItem *wPtr = (SectionItem *) itemPtr;
   char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+  SNACK_CANVAS_SET_ARGC(objc, argc);
 
   if (argc == 0) {
     Tcl_PrintDouble(interp, wPtr->x, xc);
     Tcl_PrintDouble(interp, wPtr->y, yc);
     Tcl_AppendResult(interp, xc, " ", yc, (char *) NULL);
   } else if (argc == 2) {
-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+    if ((Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 0),
+			   &wPtr->x) != TCL_OK) ||
+	(Tk_CanvasGetCoord(interp, canvas, SNACK_CANVAS_ARG(argv, objv, 1),
+			   &wPtr->y) != TCL_OK)) {
       return TCL_ERROR;
     }
     ComputeSectionBbox(canvas, wPtr);
   } else {
     char buf[80];
 
-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
+    snprintf(buf, sizeof(buf), "wrong # coordinates: expected 0 or 2, got %d", argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
     return TCL_ERROR;
@@ -730,7 +741,7 @@ UpdateSection(ClientData clientData, int flag)
 
 static int
 ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-	      int argc, char **argv, int flags)
+	      SNACK_CANVAS_CONFIG_ARGS)
 {
   SectionItem *sectPtr = (SectionItem *) itemPtr;
   Sound *s = sectPtr->sound;
@@ -740,18 +751,29 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   unsigned long mask;
   int doCompute = 0;
   int i, j;
+  int result = TCL_OK;
+  SNACK_CANVAS_SET_ARGC(objc, argc);
+  const char **cfgArgv = NULL;
 
   if (argc == 0) return TCL_OK;
 
+#if TK_MAJOR_VERSION >= 9
+  SNACK_CANVAS_PREPARE_ARGV(argc, cfgArgv, objv);
+#else
+  cfgArgv = (const char **) argv;
+#endif
   if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
-			 (CONST84 char **)argv,
-			 (char *) sectPtr, flags) != TCL_OK) return TCL_ERROR;
+			 (CONST84 char **)cfgArgv,
+			 (char *) sectPtr, flags) != TCL_OK) {
+    SNACK_CANVAS_FREE_ARGV(cfgArgv);
+    return TCL_ERROR;
+  }
 
   if (sectPtr->debug) Snack_WriteLog("Enter ConfigureSection\n");
 
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     for (j = 0; j < argc; j += 2) {
-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+      if (strncmp(cfgArgv[j], configSpecs[i].argvName, strlen(cfgArgv[j])) == 0) {
 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
 	break;
       }
@@ -760,25 +782,25 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 #if defined(MAC) || defined(MAC_OSX_TCL)
   for (i = 0; i < argc; i++) {
-    if (strncmp(argv[i], "-anchor", strlen(argv[i])) == 0) {
+    if (strncmp(cfgArgv[i], "-anchor", strlen(cfgArgv[i])) == 0) {
       i++;
-      if (strcmp(argv[i], "ne") == 0) {
+      if (strcmp(cfgArgv[i], "ne") == 0) {
 	sectPtr->anchor = 1;
-      } else if (strcmp(argv[i], "nw") == 0) {
+      } else if (strcmp(cfgArgv[i], "nw") == 0) {
 	sectPtr->anchor = 7;
-      } else if (strcmp(argv[i], "n") == 0) {
+      } else if (strcmp(cfgArgv[i], "n") == 0) {
 	sectPtr->anchor = 0;
-      } else if (strcmp(argv[i], "e") == 0) {
+      } else if (strcmp(cfgArgv[i], "e") == 0) {
 	sectPtr->anchor = 2;
-      } else if (strcmp(argv[i], "se") == 0) {
+      } else if (strcmp(cfgArgv[i], "se") == 0) {
 	sectPtr->anchor = 3;
-      } else if (strcmp(argv[i], "sw") == 0) {
+      } else if (strcmp(cfgArgv[i], "sw") == 0) {
 	sectPtr->anchor = 5;
-      } else if (strcmp(argv[i], "s") == 0) {
+      } else if (strcmp(cfgArgv[i], "s") == 0) {
 	sectPtr->anchor = 4;
-      } else if (strcmp(argv[i], "w") == 0) {
+      } else if (strcmp(cfgArgv[i], "w") == 0) {
 	sectPtr->anchor = 6;
-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
+      } else if (strncmp(cfgArgv[i], "center", strlen(cfgArgv[i])) == 0) {
 	sectPtr->anchor = 8;
       }
       break;
@@ -786,12 +808,21 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   }
 #endif
 
-  if (CheckFFTlen(interp, sectPtr->si.fftlen) != TCL_OK) return TCL_ERROR;
+  if (CheckFFTlen(interp, sectPtr->si.fftlen) != TCL_OK) {
+    result = TCL_ERROR;
+    goto done;
+  }
 
   if (CheckWinlen(interp, sectPtr->si.winlen, sectPtr->si.fftlen) != TCL_OK)
-    return TCL_ERROR;
+    {
+      result = TCL_ERROR;
+      goto done;
+    }
 
-  if (CheckLPCorder(interp, sectPtr->lpcOrder) != TCL_OK) return TCL_ERROR;
+  if (CheckLPCorder(interp, sectPtr->lpcOrder) != TCL_OK) {
+    result = TCL_ERROR;
+    goto done;
+  }
 
   if (OptSpecified(OPTION_SOUND)) {
     if (sectPtr->newSoundName == NULL) {
@@ -802,26 +833,30 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       doCompute = 1;
     } else {
       if ((s = Snack_GetSound(interp, sectPtr->newSoundName)) == NULL) {
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_CHANNEL) {
 	Tcl_AppendResult(interp, sectPtr->newSoundName, 
 			 " can not be linked to a channel", (char *) NULL);
-	return TCL_ERROR;
+	result = TCL_ERROR;
+	goto done;
       }
       if (s->storeType == SOUND_IN_FILE) {
 	s->itemRefCnt++;
       }
       sectPtr->sound = s;
       if (sectPtr->soundName == NULL) {
-	sectPtr->soundName = ckalloc(strlen(sectPtr->newSoundName)+1);
-	strcpy(sectPtr->soundName, sectPtr->newSoundName);
+	size_t nlen = strlen(sectPtr->newSoundName) + 1;
+	sectPtr->soundName = ckalloc(nlen);
+	memcpy(sectPtr->soundName, sectPtr->newSoundName, nlen);
       }
       if (strcmp(sectPtr->soundName, sectPtr->newSoundName) != 0) {
+	size_t nlen = strlen(sectPtr->newSoundName) + 1;
 	Sound *t = Snack_GetSound(interp, sectPtr->soundName);
 	ckfree(sectPtr->soundName);
-	sectPtr->soundName = ckalloc(strlen(sectPtr->newSoundName)+1);
-	strcpy(sectPtr->soundName, sectPtr->newSoundName);
+	sectPtr->soundName = ckalloc(nlen);
+	memcpy(sectPtr->soundName, sectPtr->newSoundName, nlen);
 	sectPtr->nPoints = 0;
 	sectPtr->ssmp    = 0;
 	sectPtr->esmp    = -1;
@@ -902,7 +937,8 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   if (OptSpecified(OPTION_CHANNEL)) {
     if (GetChannel(interp, sectPtr->channelstr, sectPtr->si.nchannels, 
 		   &sectPtr->si.channelSet) != TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -920,7 +956,8 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
       sectPtr->type = 0;
     } else {
       Tcl_AppendResult(interp, "-type should be FFT or LPC", (char *) NULL);
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -931,7 +968,8 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     if (GetWindowType(interp, sectPtr->windowTypeStr,
 		      &sectPtr->si.windowTypeSet)
 	!= TCL_OK) {
-      return TCL_ERROR;
+      result = TCL_ERROR;
+      goto done;
     }
     doCompute = 1;
   }
@@ -967,16 +1005,18 @@ ConfigureSection(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   ComputeSectionBbox(canvas, sectPtr);
   
   if (ComputeSectionCoords(itemPtr) != TCL_OK) {
-    return TCL_ERROR;
+    result = TCL_ERROR;
+    goto done;
   }
   
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     configSpecs[i].specFlags &= ~TK_CONFIG_OPTION_SPECIFIED;
   }
-  
+done:
   if (sectPtr->debug) Snack_WriteLog("Exit ConfigureSection\n");
 
-  return TCL_OK;
+  SNACK_CANVAS_FREE_ARGV(cfgArgv);
+  return result;
 }
 
 static void
@@ -1202,34 +1242,34 @@ SectionToPS(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, int prepass)
 
   Tcl_AppendResult(interp, "%% SECT BEGIN\n", (char *) NULL);
 
-  sprintf(buffer, "%.15g %.15g moveto\n", coords[0] + xo,
+  snprintf(buffer, sizeof(buffer), "%.15g %.15g moveto\n", coords[0] + xo,
 	  Tk_CanvasPsY(canvas, (double) (coords[1] + yo)));
   Tcl_AppendResult(interp, buffer, (char *) NULL);
   coords += 2;
   for (nPoints--; nPoints > 0; nPoints--) {
-    sprintf(buffer, "%.15g %.15g lineto\n", coords[0] + xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", coords[0] + xo,
 	    Tk_CanvasPsY(canvas, (double) (coords[1] + yo)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
     coords += 2;
   }
 
   if (sectPtr->frame) {
-    sprintf(buffer, "%.15g %.15g moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g moveto\n", (double) xo, Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo + sectPtr->width - 1,
 	    Tk_CanvasPsY(canvas, (double) (yo + sectPtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) (yo + sectPtr->height - 1)));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
 
-    sprintf(buffer, "%.15g %.15g lineto\n", (double) xo,
+    snprintf(buffer, sizeof(buffer), "%.15g %.15g lineto\n", (double) xo,
 	    Tk_CanvasPsY(canvas, (double) yo));
     Tcl_AppendResult(interp, buffer, (char *) NULL);
   }

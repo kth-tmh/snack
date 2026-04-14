@@ -1485,7 +1485,7 @@ file=$TCL_BIN_DIR/tclConfig.sh
 if test "$TCL_SHARED_BUILD" = 0; then
     { { echo "$as_me:$LINENO: error: Tcl and Tk must be configured with the --enable-shared flag" >&5
 echo "$as_me: error: Tcl and Tk must be configured with the --enable-shared flag" >&2;}
-   { (exit 1); exit 1; }; }
+   { (echo 1); echo 1; }; }
 fi
 CFLAGS=$TCL_SHLIB_CFLAGS
 LD_SEARCH_FLAGS=$TCL_LD_SEARCH_FLAGS
@@ -1575,6 +1575,10 @@ case $system in
 	AOBJ="jkAudIO_osx.o"
 	CFLAGS="-Os -fno-common"
         ;;
+    GNU-*)
+	AFLAG="-DOSS"
+	AOBJ="jkAudIO_oss.o"
+	;;
     *)
 	AFLAG="-DOTHER"
 	AOBJ="jkAudIO_skel.o"

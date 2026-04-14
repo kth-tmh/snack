@@ -46,7 +46,7 @@
 &nbsp;</dt>
 
 <dt>
-<a href="#defpack">Standard extension packages</a> (sound, snackogg, snacksphere)</dt>
+<a href="#defpack">Standard extension packages</a> (sound, snackogg, snackmpg, snacksphere)</dt>
 
 <dt>
 &nbsp;</dt>
@@ -650,7 +650,7 @@ fmt?</b> <b>?-rate f? ?-channels n? ?-encoding fmt? ?-skiphead n? ?-byteorder
 endianess? ?-start start? ?-end end?</b> <b>?-guessproperties boolean?
 ?-progress callback?</b>
 <ul>Reads new sound data from a file. Current supported file formats are
-WAV, MP3, AU, SND, AIFF, SD, SMP, CSL, and RAW binary. The command returns
+WAV, AU, SND, AIFF, SD, SMP, CSL, and RAW binary. The command returns
 the file format detected. It is possible to force a file to be read as
 RAW using "<b>-fileformat
 </b>RAW". In this case the properties of the
@@ -1064,6 +1064,12 @@ description on how to use the <b>-progress</b> option. The flag <b>-debug</b> is
 <ul>The <b>sound</b> package gives you the <b>snack::audio, snack::filter, snack::mixer, </b>and <b>snack::sound </b>commands. Basicly the same functions as the <b>snack</b> package except for graphics. This is useful on some systems if you want to use the tclsh interpreter.</ul>
 <p><b>snackogg</b>
 <ul>The <b>snackogg</b> package adds support for the Ogg/Vorbis compressed sound file format. Ogg format files and streams are detected automatically. Encoding is supported. Simply use the extension .ogg when writing files or use the option <b>-fileformat ogg</b>. When creating Ogg files the additional options <b>-nominalbitrate</b>, <b>-maxbitrate</b>, <b>-minbitrate</b>, and <b>-comment</b> apply.</ul>
+<p><b>snackmpg</b>
+<ul>The <b>snackmpg</b> package adds support for the MP3 compressed sound file format.
+MP3 format files and streams are detected automatically. Encoding is not currently
+supported. MP3 supports the following new readonly options: <b>-author</b>,
+<b>-album</b>, <b>-title</b>, <b>-year</b>, <b>-tag</b>, <b>-genre</b>, <b>-played</b>,
+<b>-remain</b>.</ul>
 <p><b>snacksphere</b>
 <ul>The <b>snacksphere</b> package adds support for reading the NIST/Sphere sound file formats. Sphere files are detected automatically.</ul>
 <p>

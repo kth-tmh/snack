@@ -20,11 +20,10 @@
  */
 
 #include "tcl.h"
-#include "snack.h"
 #include <stdio.h>
 #include <stdlib.h>
-#define USE_OLD_CANVAS /* To keep Tk8.3 happy */
 #include "tk.h"
+#include "snack.h"
 #include "jkCanvItems.h"
 #include <string.h>
 #include <math.h>
@@ -90,10 +89,10 @@ float xfft[NMAX];
 
 static int ParseColorMap(ClientData clientData, Tcl_Interp *interp,
 			 Tk_Window tkwin, CONST84 char *value, char *recordPtr,
-			 int offset);
+			 Tcl_Size offset);
 
-static char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
-			   char *recordPtr, int offset,
+static CONST86 char *PrintColorMap(ClientData clientData, Tk_Window tkwin,
+			   char *recordPtr, Tcl_Size offset,
 			   Tcl_FreeProc **freeProcPtr);
 
 Tk_CustomOption spegTagsOption = { (Tk_OptionParseProc *) NULL,
@@ -211,12 +210,12 @@ static void   ComputeSpectrogramBbox(Tk_Canvas canvas,
 				     SpectrogramItem *spegPtr);
 
 static int    ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
-				   Tk_Item *itemPtr, int argc,
-				   char **argv, int flags);
+				   Tk_Item *itemPtr, Tcl_Size argc,
+				   Tcl_Obj * const argv[], int flags);
 
 static int    CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas,
-				struct Tk_Item *itemPtr,
-				int argc, char **argv);
+				Tk_Item *itemPtr,
+				Tcl_Size argc, Tcl_Obj *const argv[]);
 
 static void   DeleteSpectrogram(Tk_Canvas canvas, Tk_Item *itemPtr,
 				Display *display);
@@ -230,7 +229,7 @@ static void   ScaleSpectrogram(Tk_Canvas canvas, Tk_Item *itemPtr,
 			       double scaleX, double scaleY);
 
 static int    SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas,
-				Tk_Item *itemPtr, int argc, char **argv);
+				Tk_Item *itemPtr, Tcl_Size argc, Tcl_Obj *const argv[]);
 
 static int    SpectrogramToArea(Tk_Canvas canvas, Tk_Item *itemPtr,
 				double *rectPtr);
@@ -262,7 +261,7 @@ Tk_ItemType snackSpectrogramType = {
   SpectrogramCoords,
   DeleteSpectrogram,
   DisplaySpectrogram,
-  0,
+  TK_CONFIG_OBJS,
   SpectrogramToPoint,
   SpectrogramToArea,
   SpectrogramToPS,
@@ -278,10 +277,11 @@ Tk_ItemType snackSpectrogramType = {
 
 static int
 CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-		  int argc, char **argv)
+		  Tcl_Size argc, Tcl_Obj *const argv[])
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr; 
   Tk_Window tkwin = Tk_CanvasTkwin(canvas);
+  int i;
  
   if (argc < 2) {
     Tcl_AppendResult(interp, "wrong # args: should be \"",
@@ -363,11 +363,19 @@ CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
     return TCL_ERROR;
   }
 
-  if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &spegPtr->x) != TCL_OK)
-      || (Tk_CanvasGetCoord(interp, canvas, argv[1], &spegPtr->y) != TCL_OK))
+  for (i = 1; i < argc; i++) {
+      Tcl_Size len;
+      char *str = Tcl_GetStringFromObj(argv[i], &len);
+      if ((len >= 2) && (str[0] == '-') && (str[1] >= 'a') && (str[1] <= 'z')) {
+	  break;
+      }
+  }
+
+  if (SpectrogramCoords(interp, canvas, (Tk_Item*)spegPtr, i, argv) != TCL_OK) {
     return TCL_ERROR;
+  }
   
-  if (ConfigureSpectrogram(interp, canvas, itemPtr, argc-2, argv+2, 0) != TCL_OK) {
+  if (ConfigureSpectrogram(interp, canvas, itemPtr, argc-i, argv+i, 0) != TCL_OK) {
     DeleteSpectrogram(canvas, itemPtr, Tk_Display(Tk_CanvasTkwin(canvas)));
     return TCL_ERROR;
   }
@@ -376,30 +384,42 @@ CreateSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
 static int
 SpectrogramCoords(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-		  int argc, char **argv)
+		  Tcl_Size argc, Tcl_Obj *const argv[])
 {
-  SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr;
-  char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE]; 
- 
+
+  SpectrogramItem *wPtr = (SpectrogramItem *) itemPtr;
+  char xc[TCL_DOUBLE_SPACE], yc[TCL_DOUBLE_SPACE];
+  int result = TCL_OK;
+
   if (argc == 0) {
-    Tcl_PrintDouble(interp, spegPtr->x, xc);
-    Tcl_PrintDouble(interp, spegPtr->y, yc);
+    Tcl_PrintDouble(interp, wPtr->x, xc);
+    Tcl_PrintDouble(interp, wPtr->y, yc);
     Tcl_AppendResult(interp, xc, " ", yc, (char *) NULL);
-  } else if (argc == 2) {
-    if ((Tk_CanvasGetCoord(interp, canvas, argv[0], &spegPtr->x) != TCL_OK) ||
-	(Tk_CanvasGetCoord(interp, canvas, argv[1], &spegPtr->y) != TCL_OK)) {
-      return TCL_ERROR;
+    return TCL_OK;
+  }
+  
+  if (argc == 1) {
+      if (Tcl_ListObjGetElements(interp, argv[0], &argc, (Tcl_Obj ***) &argv) != TCL_OK) {
+	  return TCL_ERROR;
+      }
+  }
+
+  if (argc == 2) {
+    if ((Tk_CanvasGetCoordFromObj(interp, canvas, argv[0], &wPtr->x) != TCL_OK) ||
+	(Tk_CanvasGetCoordFromObj(interp, canvas, argv[1], &wPtr->y) != TCL_OK)) {
+      result = TCL_ERROR;
+    } else {
+      ComputeSpectrogramBbox(canvas, wPtr);
     }
-    ComputeSpectrogramBbox(canvas, spegPtr);
   } else {
     char buf[80];
 
-    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", argc);
+    sprintf(buf, "wrong # coordinates: expected 0 or 2, got %d", (int)argc);
     Tcl_SetResult(interp, buf, TCL_VOLATILE);
 
-    return TCL_ERROR;
+    result = TCL_ERROR;
   }
-  return TCL_OK;
+  return result;
 }
 
 static void
@@ -564,7 +584,7 @@ UpdateSpeg(ClientData clientData, int flag)
 
 static int
 ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr, 
-		     int argc, char **argv, int flags)
+		     Tcl_Size argc, Tcl_Obj *const argv[], int flags)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) itemPtr;
   Sound *s = spegPtr->sound;
@@ -577,15 +597,16 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
 
   /*  if (spegPtr->si.computing) return TCL_OK;*/
 
-  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc,
-			 (CONST84 char **)argv, 
-			 (char *) spegPtr, flags) != TCL_OK) return TCL_ERROR;
+  if (Tk_ConfigureWidget(interp, tkwin, configSpecs, argc, (void *)argv, 
+			 (char *) spegPtr, flags|TK_CONFIG_OBJS) != TCL_OK) return TCL_ERROR;
 
   if (spegPtr->si.debug > 1) Snack_WriteLog("  Enter ConfigureSpeg\n");
   
   for (i = 0; configSpecs[i].type != TK_CONFIG_END; i++) {
     for (j = 0; j < argc; j += 2) {
-      if (strncmp(argv[j], configSpecs[i].argvName, strlen(argv[j])) == 0) {
+      Tcl_Size len;
+      char *str = Tcl_GetStringFromObj(argv[j], &len);
+      if (strncmp(str, configSpecs[i].argvName, len) == 0) {
 	configSpecs[i].specFlags |= TK_CONFIG_OPTION_SPECIFIED;
 	break;
       }
@@ -594,26 +615,28 @@ ConfigureSpectrogram(Tcl_Interp *interp, Tk_Canvas canvas, Tk_Item *itemPtr,
   
 #if defined(MAC) || defined(MAC_OSX_TCL)
   for (i = 0; i < argc; i++) {
-    int l = strlen(argv[i]);
-    if (l && strncmp(argv[i], "-anchor", l) == 0) {
+    Tcl_Size l;
+    char *str = Tcl_GetStringFromObj(argv[i], &l);
+    if (l && strncmp(str, "-anchor", l) == 0) {
       i++;
-      if (strcmp(argv[i], "ne") == 0) {
+      str = Tcl_GetStringFromObj(argv[i], &l);
+      if (strcmp(str, "ne") == 0) {
 	spegPtr->anchor = 1;
-      } else if (strcmp(argv[i], "nw") == 0) {
+      } else if (strcmp(str, "nw") == 0) {
 	spegPtr->anchor = 7;
-      } else if (strcmp(argv[i], "n") == 0) {
+      } else if (strcmp(str, "n") == 0) {
 	spegPtr->anchor = 0;
-      } else if (strcmp(argv[i], "e") == 0) {
+      } else if (strcmp(str, "e") == 0) {
 	spegPtr->anchor = 2;
-      } else if (strcmp(argv[i], "se") == 0) {
+      } else if (strcmp(str, "se") == 0) {
 	spegPtr->anchor = 3;
-      } else if (strcmp(argv[i], "sw") == 0) {
+      } else if (strcmp(str, "sw") == 0) {
 	spegPtr->anchor = 5;
-      } else if (strcmp(argv[i], "s") == 0) {
+      } else if (strcmp(str, "s") == 0) {
 	spegPtr->anchor = 4;
-      } else if (strcmp(argv[i], "w") == 0) {
+      } else if (strcmp(str, "w") == 0) {
 	spegPtr->anchor = 6;
-      } else if (strncmp(argv[i], "center", strlen(argv[i])) == 0) {
+      } else if (strncmp(str, "center", l) == 0) {
 	spegPtr->anchor = 8;
       }
       break;
@@ -1705,10 +1728,11 @@ DrawSpeg(SnackItemInfo *siPtr, Display* disp, GC gc, int width, int height,
 
 static int
 ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
-	      CONST84 char *value, char *recordPtr, int offset)
+	      CONST84 char *value, char *recordPtr, Tcl_Size offset)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
-  int argc, i;
+  int i;
+  Tcl_Size argc;
   CONST84 char **argv = NULL;
 
   if (Tcl_SplitList(interp, value, &argc, &argv) != TCL_OK) {
@@ -1797,9 +1821,9 @@ ParseColorMap(ClientData clientData, Tcl_Interp *interp, Tk_Window tkwin,
   return TCL_OK;
 }
 
-static char*
+static CONST86 char*
 PrintColorMap(ClientData clientData, Tk_Window tkwin, char *recordPtr,
-	      int offset, Tcl_FreeProc **freeProcPtr)
+	      Tcl_Size offset, Tcl_FreeProc **freeProcPtr)
 {
   SpectrogramItem *spegPtr = (SpectrogramItem *) recordPtr;
   char *buffer;

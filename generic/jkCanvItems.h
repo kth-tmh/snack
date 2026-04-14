@@ -23,6 +23,12 @@
 extern "C" {
 #endif
 
+/* Tk_Offset was removed in Tk 9; provide a compat definition using offsetof */
+#ifndef Tk_Offset
+#  include <stddef.h>
+#  define Tk_Offset(type, field) ((int) offsetof(type, field))
+#endif
+
 #define NDEFCOLS 256
 #define FRAMESIZE 262144
 
@@ -98,7 +104,9 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #endif
 
 #if defined(WIN) || defined(MAC) || defined(MAC_OSX_TK)
+#  ifndef XFree
 #  define XFree(data) {if ((data) != NULL) ckfree((char *) (data));}
+#  endif
 #endif
 
 #if defined MAC
@@ -106,6 +114,38 @@ extern int  CheckLPCorder(Tcl_Interp *interp, int lpcorder);
 #  define hypot hypotd
 
   extern double hypot(double x, double y);
+#endif
+
+/* TK_CONFIG_OPTION_SPECIFIED was removed in Tk 9; the bit value (0x4) is
+ * preserved here so that specFlags-based tracking of which options were
+ * explicitly set continues to work. */
+#ifndef TK_CONFIG_OPTION_SPECIFIED
+#   define TK_CONFIG_OPTION_SPECIFIED 0x4
+#endif
+
+#if TK_MAJOR_VERSION >= 9
+#  define SNACK_CANVAS_CREATE_ARGS Tcl_Size objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_COORD_ARGS Tcl_Size objc, Tcl_Obj *const objv[]
+#  define SNACK_CANVAS_CONFIG_ARGS Tcl_Size objc, Tcl_Obj *const objv[], int flags
+#  define SNACK_CANVAS_SET_ARGC(objc, argc) const Tcl_Size argc = objc
+#  define SNACK_CANVAS_ARG(argv, objv, i) Tcl_GetString((objv)[i])
+#  define SNACK_CANVAS_PREPARE_ARGV(argc, argv, objv) \
+     do { \
+       Tcl_Size snack_i; \
+       (argv) = (const char **) ckalloc((unsigned) (argc) * sizeof(char *)); \
+       for (snack_i = 0; snack_i < (argc); snack_i++) { \
+         (argv)[snack_i] = Tcl_GetString((objv)[snack_i]); \
+       } \
+     } while (0)
+#  define SNACK_CANVAS_FREE_ARGV(argv) ckfree((char *) (argv))
+#else
+#  define SNACK_CANVAS_CREATE_ARGS int argc, char **argv
+#  define SNACK_CANVAS_COORD_ARGS int argc, char **argv
+#  define SNACK_CANVAS_CONFIG_ARGS int argc, char **argv, int flags
+#  define SNACK_CANVAS_SET_ARGC(objc, argc) ((void) 0)
+#  define SNACK_CANVAS_ARG(argv, objv, i) (argv)[i]
+#  define SNACK_CANVAS_PREPARE_ARGV(argc, argv, objv) ((void) 0)
+#  define SNACK_CANVAS_FREE_ARGV(argv) ((void) 0)
 #endif
 
 #define OptSpecified(option) (configSpecs[option].specFlags & TK_CONFIG_OPTION_SPECIFIED)

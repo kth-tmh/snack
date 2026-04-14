@@ -65,7 +65,7 @@ int
 Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
 	       Tcl_Obj *CONST objv[])
 {
-  int len;
+  Tcl_Size len;
   char *str;
   CONST84 char *patchLevelStr;
 
@@ -95,12 +95,16 @@ Snack_DebugCmd(ClientData cdata, Tcl_Interp *interp, int objc,
     }
     str = Tcl_GetStringFromObj(objv[3], &len);
     snackDumpFile = (char *) ckalloc(len + 1);
-    strcpy(snackDumpFile, str);
+    memcpy(snackDumpFile, str, (size_t)len + 1);
   }
-  if (debugLevel > 0) {
+  if (debugLevel > 0 && snackDebugChannel != NULL) {
     patchLevelStr = Tcl_GetVar(interp, "sound::patchLevel", TCL_GLOBAL_ONLY);
     Tcl_Write(snackDebugChannel, "Sound patch level: ", 19);
-    Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
+    if (patchLevelStr != NULL) {
+      Tcl_Write(snackDebugChannel, patchLevelStr, strlen(patchLevelStr));
+    } else {
+      Tcl_Write(snackDebugChannel, "unknown", 7);
+    }
     Tcl_Write(snackDebugChannel, "\n", 1);
     Tcl_Flush(snackDebugChannel);
   }
@@ -149,7 +153,7 @@ Sound_Init(Tcl_Interp *interp)
   char rates[100];
   
 #ifdef USE_TCL_STUBS
-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }
 #endif
@@ -157,7 +161,7 @@ Sound_Init(Tcl_Interp *interp)
   version = Tcl_GetVar(interp, "tcl_version",
 		       (TCL_GLOBAL_ONLY | TCL_LEAVE_ERR_MSG));
   
-  if (strcmp(version, "8.0") == 0) {
+  if (version != NULL && strcmp(version, "8.0") == 0) {
     useOldObjAPI = 1;
   }
 
@@ -278,6 +282,7 @@ Snack_WriteLog(char *str)
     snackDebugChannel = Tcl_OpenFileChannel(debugInterp, "_debug.txt", "w",
 					    420);
   }
+  if (snackDebugChannel == NULL) return;
   Tcl_Write(snackDebugChannel, str, strlen(str));
   Tcl_Flush(snackDebugChannel);
 }
@@ -291,8 +296,9 @@ Snack_WriteLogInt(char *str, int num)
     snackDebugChannel = Tcl_OpenFileChannel(debugInterp, "_debug.txt", "w",
 					    420);
   }
+  if (snackDebugChannel == NULL) return;
   Tcl_Write(snackDebugChannel, str, strlen(str));
-  sprintf(buf, " %d", num);
+  snprintf(buf, sizeof(buf), " %d", num);
   Tcl_Write(snackDebugChannel, buf, strlen(buf));
   Tcl_Write(snackDebugChannel, "\n", 1);
   Tcl_Flush(snackDebugChannel);

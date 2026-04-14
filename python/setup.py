@@ -130,7 +130,6 @@ sources = [
     os.path.join(GENERIC, "jkSoundEngine.c"),
     os.path.join(GENERIC, "jkSoundEdit.c"),
     os.path.join(GENERIC, "jkSoundFile.c"),
-    os.path.join(GENERIC, "jkFormatMP3.c"),
     os.path.join(GENERIC, "jkSoundProc.c"),
     os.path.join(GENERIC, "ffa.c"),
     os.path.join(GENERIC, "jkPitchCmd.c"),

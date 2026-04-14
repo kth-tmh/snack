@@ -326,7 +326,7 @@ EXPORT(int, Snacksphere_Init) _ANSI_ARGS_((Tcl_Interp *interp))
   int res;
   
 #ifdef USE_TCL_STUBS
-  if (Tcl_InitStubs(interp, "8", 0) == NULL) {
+  if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }
 #endif

@@ -36,7 +36,7 @@
 
 #define NBUFS 64
 
-extern int eround();
+extern int eround(double x);
 
 static HWAVEOUT      hWaveOut;
 static HWAVEIN       hWaveIn;
@@ -58,15 +58,15 @@ static MIXERCAPS     wMixCaps;
 /*static ADesc  winad;*/
 static int    correction = 1;
 
-const static GUID  KSDATAFORMAT_SUBTYPE_PCM = {0x00000001,0x0000,0x0010,
-                                                {0x80,
-                                                0x00,
-                                                0x00,
-                                                0xaa,
-                                                0x00,
-                                                0x38,
-                                                0x9b,
-                                                0x71}};
+static const GUID snackKSDATAFORMAT_SUBTYPE_PCM = {0x00000001,0x0000,0x0010,
+                                                   {0x80,
+                                                    0x00,
+                                                    0x00,
+                                                    0xaa,
+                                                    0x00,
+                                                    0x38,
+                                                    0x9b,
+                                                    0x71}};
 #define SNACK_NUMBER_MIXERS 1
 
 struct MixerLink mixerLinks[SNACK_NUMBER_MIXERS][2];
@@ -80,6 +80,11 @@ static char *mixerDeviceList[MAX_NUM_DEVICES];
 static int numMixDevs = 0;
 
 #include <dsound.h>
+#ifndef  WAVE_FORMAT_ALAW
+#define  WAVE_FORMAT_ALAW 0x0006
+#define  WAVE_FORMAT_MULAW 0x0007
+#endif
+
 #define DSBCAPS_CTRLDEFAULT 0x000000E0
 
 static char *DSOutDeviceList[MAX_NUM_DEVICES];
@@ -414,7 +419,7 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	wFormatIn2.Format.cbSize          = sizeof(WAVEFORMATEXTENSIBLE);
 	wFormatIn2.Samples.wValidBitsPerSample   = 3 * 8;
 	wFormatIn2.Samples.wValidBitsPerSample   = A->bytesPerSample * 8;
-	wFormatIn2.SubFormat              = KSDATAFORMAT_SUBTYPE_PCM;
+	wFormatIn2.SubFormat              = snackKSDATAFORMAT_SUBTYPE_PCM;
 	wFormatIn2.dwChannelMask = 0;
 
 	res = waveInOpen(&hWaveIn, devIndex, 
@@ -497,7 +502,7 @@ SnackAudioOpen(ADesc *A, Tcl_Interp *interp, char *device,
 	wFormatOut2.Format.cbSize          = sizeof(WAVEFORMATEXTENSIBLE);
 	wFormatOut2.Samples.wValidBitsPerSample   = 3 * 8;
 	wFormatOut2.Samples.wValidBitsPerSample   = A->bytesPerSample * 8;
-	wFormatOut2.SubFormat              = KSDATAFORMAT_SUBTYPE_PCM;
+	wFormatOut2.SubFormat              = snackKSDATAFORMAT_SUBTYPE_PCM;
 	wFormatOut2.dwChannelMask = 0;
 
 	res = waveOutOpen(&hWaveOut, devIndex, 

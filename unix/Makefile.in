@@ -31,11 +31,11 @@ CC        = @CC@
 
 INCLUDES  = ${XINCLUDES} @TCL_INCLUDE_SPEC@ -I${TCL_INCPATH} -I${TK_INCPATH} @AINC@ @NISTINC@
 
-CFLAGS    = -O @CFLAGS@ @AFLAG@ ${INCLUDES} @TCLAPI@ -I${GENERIC_DIR} @DEFS@
+CFLAGS    = ${DEB_CFLAGS} -O @CFLAGS@ @AFLAG@ ${INCLUDES} @TCLAPI@ -I${GENERIC_DIR} @DEFS@
 
 LIBSO     = -lc @ALIB@ @TCL_LIB_SPEC@
 
-LIBSN     = -lc @TK_LIBS@ @ALIB@ @TCL_LIB_SPEC@ @TK_LIB_SPEC@
+LIBSN     = -lc @ALIB@ @TCL_LIB_SPEC@ @TK_LIB_SPEC@
 
 SHLIB_LD     = @SHLIB_LD@
 SHLIB_SUFFIX = @SHLIB_SUFFIX@
@@ -43,13 +43,13 @@ SHLIB_SUFFIX = @SHLIB_SUFFIX@
 all: libsound${SHLIB_SUFFIX} libsnack${SHLIB_SUFFIX} @DOSTUBLIB@ @LIBNIST@ @LIBOGG@ editversion
 
 OBJSO = sound.o jkSound.o jkSoundEngine.o jkSoundEdit.o jkSoundFile.o \
-	g711.o @AOBJ@ jkFormatMP3.o jkSoundProc.o ffa.o jkPitchCmd.o \
+	g711.o @AOBJ@ jkSoundProc.o ffa.o jkPitchCmd.o \
 	@STUBINITOBJ@ jkAudio.o jkMixer.o shape.o jkFilter.o jkSynthesis.o \
 	jkFilterIIR.o jkGetF0.o sigproc.o jkFormant.o sigproc2.o
 
 OBJSN = snack.o jkSound.o jkSoundEngine.o jkSoundEdit.o jkSoundFile.o \
 	jkCanvSpeg.o jkCanvWave.o jkCanvSect.o ffa.o g711.o @AOBJ@ \
-	jkFormatMP3.o jkSoundProc.o jkPitchCmd.o @STUBINITOBJ@ \
+	jkSoundProc.o jkPitchCmd.o @STUBINITOBJ@ \
 	jkAudio.o jkMixer.o shape.o jkFilter.o jkSynthesis.o jkFilterIIR.o \
 	jkGetF0.o sigproc.o jkFormant.o sigproc2.o
 
@@ -73,8 +73,6 @@ jkSoundFile.o: $(GENERIC_DIR)/jkSoundFile.c
 g711.o: $(GENERIC_DIR)/g711.c
 	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/g711.c
 
-jkFormatMP3.o: $(GENERIC_DIR)/jkFormatMP3.c
-	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/jkFormatMP3.c
 
 jkSoundProc.o: $(GENERIC_DIR)/jkSoundProc.c
 	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/jkSoundProc.c
@@ -155,7 +153,7 @@ sigproc2.o: $(GENERIC_DIR)/sigproc2.c
 	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/sigproc2.c
 
 snackStubLib.o: $(GENERIC_DIR)/snackStubLib.c
-	$(CC) -c $(CFLAGS) $(GENERIC_DIR)/snackStubLib.c
+	$(CC) -c $(CFLAGS) -UALSA -UOSS $(GENERIC_DIR)/snackStubLib.c
 
 libsound${SHLIB_SUFFIX}: ${OBJSO}
 	${SHLIB_LD} ${OBJSO} ${LIBSO} -o libsound${SHLIB_SUFFIX} 
@@ -296,11 +294,23 @@ libsnacksphere${SHLIB_SUFFIX}: ${OBJNIST}
 LIBOGG = @OGGLIBS@ -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
 OBJOGG = SnackOgg.o
 
-SnackOgg.o: $(GENERIC_DIR)/SnackOgg.c
-	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS $(GENERIC_DIR)/SnackOgg.c
+LIBMPG = -lmpg123 -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
+OBJMPG = SnackMpg.o
 
-libsnackogg${SHLIB_SUFFIX}: ${OBJOGG}
+LIBMP3 = -lc @TCL_LIB_SPEC@ -L. @SNACK_STUB_LIB_FLAG@
+OBJMP3 = SnackMP3.o
+
+SnackOgg.o: $(GENERIC_DIR)/SnackOgg.c
+	$(CC) @OGGINC@ -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackOgg.c
+
+libsnackogg${SHLIB_SUFFIX}: ${OBJOGG} @DOSTUBLIB@
 	${SHLIB_LD} ${OBJOGG} ${LIBOGG} -o libsnackogg${SHLIB_SUFFIX}
+
+SnackMpg.o: $(GENERIC_DIR)/SnackMpg.c
+	$(CC) -c $(CFLAGS) -DUSE_SNACK_STUBS -UALSA -UOSS $(GENERIC_DIR)/SnackMpg.c
+
+libsnackmpg${SHLIB_SUFFIX}: ${OBJMPG} @DOSTUBLIB@
+	${SHLIB_LD} ${OBJMPG} ${LIBMPG} -o libsnackmpg${SHLIB_SUFFIX}
 
 install:
 	@if [ ! -d ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION} ] ; then \
@@ -314,6 +324,7 @@ install:
 	if test -f libsnackstub${VERSION}.a; then cp -f libsnackstub${VERSION}.a ${DESTDIR}${SNACK_INSTALL_PATH}/; fi
 	if test -f libsnacksphere${SHLIB_SUFFIX}; then cp -f libsnacksphere${SHLIB_SUFFIX} ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION}/; fi
 	if test -f libsnackogg${SHLIB_SUFFIX}; then cp -f libsnackogg${SHLIB_SUFFIX} ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION}/; fi
+	if test -f libsnackmpg${SHLIB_SUFFIX}; then cp -f libsnackmpg${SHLIB_SUFFIX} ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION}/; fi
 	cp -f $(UNIX_DIR)/snack.tcl ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION}/
 	cp -f pkgIndex.tcl ${DESTDIR}${SNACK_INSTALL_PATH}/snack${VERSION}/
 

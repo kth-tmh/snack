@@ -53,6 +53,7 @@ static Tcl_TimerToken rtoken;
 #define BUFSCROLLSIZE 25000
 struct jkQueuedSound *rsoundQueue = NULL;
 
+extern int failRate;
 extern int debugLevel;
 extern char *snackDumpFile;
 static Tcl_Channel snackDumpCh = NULL;
@@ -89,13 +90,16 @@ RecCallback(ClientData clientData)
   for (p = rsoundQueue; p != NULL; p = p->next) {
     Sound *s = p->sound;
 
+    if (s->nchannels <= 0)  {
+        continue;
+    }
     if (s->debug > 2) Snack_WriteLogInt("    readstatus? ", s->readStatus);
     if (s->readStatus == IDLE) continue;
     if (p->status) continue;
     if (s->rwchan) { /* sound from file or channel */
 
       if ((s->length + nRead - s->validStart) * s->nchannels > FBLKSIZE) {
-	s->validStart += (BUFSCROLLSIZE / s->nchannels);
+	s->validStart += (s->nchannels<=0?0:(BUFSCROLLSIZE / s->nchannels));
 	memmove(&s->blocks[0][0], &s->blocks[0][BUFSCROLLSIZE],
 		(FBLKSIZE-BUFSCROLLSIZE) * sizeof(float));
       }
@@ -272,6 +276,10 @@ AssembleSoundChunk(int inSize)
     if (p->startTime > globalNWritten + size) continue;
 
     s = p->sound;
+    if (s->nchannels <= 0) {
+       continue;
+    }
+
     startPos = p->startPos;
     endPos = p->endPos;
     totLen = endPos - startPos + 1;
@@ -299,6 +307,7 @@ AssembleSoundChunk(int inSize)
 	if (s->debug > 1) Snack_WriteLogInt("      first ", first);
 	longestChunk = max(longestChunk, writeSize);
 	for (i = 0; i < first * s->nchannels; i++) fff[i] = 0.0f;
+	s->globalRate = s->samprate;
 	if (s->samprate == globalRate) {
 	  for (i = first * s->nchannels, j = (startPos + nWritten) * 
 		 s->nchannels; i < writeSize * s->nchannels;
@@ -357,7 +366,7 @@ AssembleSoundChunk(int inSize)
 	    fff[i] = GetSample(&s->linkInfo, j);
 	    if (s->linkInfo.eof) {
 	      inputExhausted = 1;
-	      writeSize = i / s->nchannels;
+	      writeSize = (s->nchannels <= 0 ? 0 : i / s->nchannels);
 	      break;
 	    }
 	  }
@@ -379,7 +388,7 @@ AssembleSoundChunk(int inSize)
 	      fff[i * s->nchannels + c] = smp1 * (1.0f - f) + smp2 * f;
 	      if (s->linkInfo.eof) {
 		inputExhausted = 1;
-		writeSize = i / s->nchannels;
+	        writeSize = (s->nchannels <= 0 ? 0 : i / s->nchannels);
 		break;
 	      }
 	    }
@@ -709,8 +718,8 @@ Snack_StopSound(Sound *s, Tcl_Interp *interp)
     /* In-memory sound record */
 
     if ((rop == READ || rop == PAUSED) && (s->readStatus == READ)) {
-      for (p = rsoundQueue; p->sound != s; p = p->next);
-      if (p->sound == s) {
+      for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+      if (p != NULL && p->sound == s) {
 	if (p->next != NULL) {
 	  p->next->prev = p->prev;
 	}
@@ -796,8 +805,8 @@ Snack_StopSound(Sound *s, Tcl_Interp *interp)
 
     if ((rop == READ || rop == PAUSED) && (s->readStatus == READ)) {
       Snack_FileFormat *ff;
-      for (p = rsoundQueue; p->sound != s; p = p->next);
-      if (p->sound == s) {
+      for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+      if (p != NULL && p->sound == s) {
 	if (p->next != NULL) {
 	  p->next->prev = p->prev;
 	}
@@ -815,13 +824,13 @@ Snack_StopSound(Sound *s, Tcl_Interp *interp)
 	SnackAudioPause(&adi);
 	remaining = SnackAudioReadable(&adi);
 
-	while (remaining > 0) {
+	while (remaining > 0 && s->nchannels >= 0) {
 	  int nRead = 0, i;
 	  int size = s->samprate / 16;
 	  nRead = SnackAudioRead(&adi, shortBuffer, size);
 	  	  
        	  if ((s->length + nRead - s->validStart) * s->nchannels > FBLKSIZE) {
-	    s->validStart += (BUFSCROLLSIZE / s->nchannels);
+	    s->validStart += (s->nchannels<=0?0:(BUFSCROLLSIZE / s->nchannels));
 	    memmove(&s->blocks[0][0], &s->blocks[0][BUFSCROLLSIZE],
 		    (FBLKSIZE-BUFSCROLLSIZE) * sizeof(float));
 	  }
@@ -967,7 +976,8 @@ playCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
   s->devStr = defaultOutDevice;
 
   for (arg = 2; arg < objc; arg+=2) {
-    int index, length;
+    int index;
+    Tcl_Size length;
     char *str;
     
     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings,
@@ -1271,16 +1281,24 @@ playCmd(Sound *s, Tcl_Interp *interp, int objc,	Tcl_Obj *CONST objv[])
 
   if (SnackAudioOpen(&ado, interp, s->devStr, PLAY, rate, devChannels,
 		     LIN16) != TCL_OK) {
-    wop = IDLE;
-    s->writeStatus = IDLE;
-    return TCL_ERROR;
+      /* Retry to support low-end cards: TODO: do in SnackAudioOpen  */
+      if (failRate <= 0 || SnackAudioOpen(&ado, interp, s->devStr, PLAY,
+	       failRate, devChannels, LIN16) != TCL_OK) {
+          wop = IDLE;
+          s->writeStatus = IDLE;
+          return TCL_ERROR;
+      } else {
+	  rate = failRate;
+      }
   }
   if (snackDumpFile) {
     snackDumpCh = Tcl_OpenFileChannel(interp, snackDumpFile, "w", 438);
-    Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
+    if (snackDumpCh != NULL) {
+      Tcl_SetChannelOption(interp, snackDumpCh, "-translation", "binary");
 #ifdef TCL_81_API
-    Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
+      Tcl_SetChannelOption(interp, snackDumpCh, "-encoding", "binary");
 #endif
+    }
   }
   globalRate = rate;
   globalOutWidth = devChannels;
@@ -1351,7 +1369,8 @@ recordCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   s->tmpbuf = NULL;
       
   for (arg = 2; arg < objc; arg+=2) {
-    int index, length;
+    int index;
+    Tcl_Size length;
     char *str;
     
     if (Tcl_GetIndexFromObj(interp, objv[arg], subOptionStrings, "option",
@@ -1606,7 +1625,7 @@ pauseCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
     int hw = 1;
 
     for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
-    if (p->sound == s) {
+    if (p != NULL && p->sound == s) {
       if (p->status == SNACK_QS_QUEUED) {
 	p->status = SNACK_QS_PAUSED;
       } else if (p->status == SNACK_QS_PAUSED) {
@@ -1657,8 +1676,8 @@ pauseCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 	s->readStatus = READ;
 	Tcl_DeleteTimerHandler(rtoken);
       } else if (rop == PAUSED) {
-	for (p = rsoundQueue; p->sound != s; p = p->next);
-	if (p->sound == s) {
+	for (p = rsoundQueue; p != NULL && p->sound != s; p = p->next);
+	if (p != NULL && p->sound == s) {
 	  p->status = SNACK_QS_QUEUED;
 	}
 	
@@ -1689,12 +1708,13 @@ int
 current_positionCmd(Sound *s, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
 {
   int n = -1;
-  int arg, len, type = 0;
+  int arg, type = 0;
+  Tcl_Size len;
   jkQueuedSound *p;
 
   if (soundQueue != NULL) {
     for (p = soundQueue; p != NULL && p->sound != s; p = p->next);
-    if (p->sound == s) {
+    if (p != NULL && p->sound == s) {
       n = p->startPos + p->nWritten;
     }
   }

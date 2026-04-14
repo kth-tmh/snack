@@ -36,8 +36,14 @@
 
 int	    debug_level = 0;
 
+int init_dp_f0(double freq, F0_params *par, long *buffsize, long *sdstep);
+int dp_f0(float *fdata, int buff_size, int sdstep, double freq,
+          F0_params *par, float **f0p_pt, float **vuvp_pt, float **rms_speech_pt,
+          float **acpkp_pt, int *vecsize, int last_time);
 void free_dp_f0();
-static int check_f0_params();
+static int check_f0_params(Tcl_Interp *interp, F0_params *par, double sample_freq);
+void get_fast_cands(float *fdata, float *fdsdata, int ind, int step, int size, int dec, int start, int nlags,
+                    float *engref, int *maxloc, float *maxval, Cross *cp, float *peaks, int *locs, int *ncand, F0_params *par);
 
 int
 Get_f0(Sound *sound, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
@@ -49,7 +55,6 @@ Get_f0(Sound *sound, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   F0_params *par, *read_f0_params();
   float *f0p, *vuvp, *rms_speech, *acpkp;
   int i, vecsize;
-  int init_dp_f0(), dp_f0();
   static int framestep = -1;
   long sdstep = 0, total_samps;
   int ndone = 0;
@@ -305,15 +310,16 @@ check_f0_params(Tcl_Interp *interp, F0_params *par, double sample_freq)
   return(error);
 }
 
-static void get_cand(), peak(), do_ffir();
-static int lc_lin_fir(), downsamp();
+static void get_cand(Cross *cross, float *peak, int *loc, int nlags, int *ncand, float cand_thresh);
+static void peak(float *y, float *xp, float *yp);
+static int lc_lin_fir(register float fc, int *nf, float *coef);
+static int downsamp(float *in, float *out, int samples, int *outsamps, int state_idx, int decimate, int ncoef, float *fc, int init);
+extern void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init);
+extern float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time);
 
 /* ----------------------------------------------------------------------- */
-void get_fast_cands(fdata, fdsdata, ind, step, size, dec, start, nlags, engref, maxloc, maxval, cp, peaks, locs, ncand, par)
-     float *fdata, *fdsdata, *engref, *maxval, *peaks;
-     int size, start, nlags, *maxloc, *locs, *ncand, ind, step, dec;
-     Cross *cp;
-     F0_params *par;
+void get_fast_cands(float *fdata, float *fdsdata, int ind, int step, int size, int dec, int start, int nlags,
+                    float *engref, int *maxloc, float *maxval, Cross *cp, float *peaks, int *locs, int *ncand, F0_params *par)
 {
   int decind, decstart, decnlags, decsize, i, j, *lp;
   float *corp, xp, yp, lag_wt;
@@ -392,10 +398,7 @@ void get_fast_cands(fdata, fdsdata, ind, step, size, dec, start, nlags, engref, 
 }
 
 /* ----------------------------------------------------------------------- */
-float *downsample(input,samsin,state_idx,freq,samsout,decimate, first_time, last_time)
-     double freq;
-     float *input;
-      int samsin, *samsout, decimate, state_idx, first_time, last_time;
+float *downsample(float *input, int samsin, int state_idx, double freq, int *samsout, int decimate, int first_time, int last_time)
 {
   static float	b[2048];
   static float *foutput = NULL;
@@ -442,11 +445,7 @@ float *downsample(input,samsin,state_idx,freq,samsout,decimate, first_time, last
 
 /* ----------------------------------------------------------------------- */
 /* Get likely candidates for F0 peaks. */
-static void get_cand(cross,peak,loc,nlags,ncand,cand_thresh)
-     Cross *cross;
-     float *peak, cand_thresh;
-     int *loc;
-     int  *ncand, nlags;
+static void get_cand(Cross *cross, float *peak, int *loc, int nlags, int *ncand, float cand_thresh)
 {
   register int i, lastl, *t;
   register float o, p, q, *r, *s, clip;
@@ -488,11 +487,7 @@ static void get_cand(cross,peak,loc,nlags,ncand,cand_thresh)
 /* ----------------------------------------------------------------------- */
 /* buffer-to-buffer downsample operation */
 /* This is STRICTLY a decimator! (no upsample) */
-static int downsamp(in, out, samples, outsamps, state_idx, decimate, ncoef, fc, init)
-     float *in, *out;
-     int samples, *outsamps, decimate, ncoef, state_idx;
-     float fc[];
-     int init;
+static int downsamp(float *in, float *out, int samples, int *outsamps, int state_idx, int decimate, int ncoef, float *fc, int init)
 {
   if(in && out) {
     do_ffir(in, samples, out, outsamps, state_idx, ncoef, fc, 0, decimate, init);
@@ -503,17 +498,13 @@ static int downsamp(in, out, samples, outsamps, state_idx, decimate, ncoef, fc, 
 }
 
 /*      ----------------------------------------------------------      */
-static void do_ffir(buf,in_samps,bufo,out_samps,idx, ncoef,fc,invert,skip,init)
+void do_ffir(register float *buf, register int in_samps, register float *bufo, register int *out_samps, int idx, register int ncoef, float *fc, register int invert, register int skip, register int init)
 /* fc contains 1/2 the coefficients of a symmetric FIR filter with unity
     passband gain.  This filter is convolved with the signal in buf.
     The output is placed in buf2.  If(invert), the filter magnitude
     response will be inverted.  If(init&1), beginning of signal is in buf;
     if(init&2), end of signal is in buf.  out_samps is set to the number of
     output points placed in bufo. */
-register float	*buf, *bufo;
-float *fc;
-register int in_samps, ncoef, invert, skip, init, *out_samps;
-int idx;
 {
   register float *dp1, *dp2, *dp3, sum, integral;
   static float *co=NULL, *mem=NULL;
@@ -524,10 +515,11 @@ int idx;
   register float *buf1;
 
   buf1 = buf;
-  if(ncoef > fsize) {/*allocate memory for full coeff. array and filter memory */    fsize = 0;
+  if(ncoef > fsize) {	/* allocate memory for full coeff. array and filter memory */
     i = (ncoef+1)*2;
     if(!((co = (float *)ckrealloc((void *)co, sizeof(float)*i)) &&
 	 (mem = (float *)ckrealloc((void *)mem, sizeof(float)*i)))) {
+      fsize = 0;
       fprintf(stderr,"allocation problems in do_fir()\n");
       return;
     }
@@ -553,73 +545,70 @@ int idx;
       *dp1 = integral - *dp3;
     }
 
-    for(i=ncoef-1, dp1=mem; i-- > 0; ) *dp1++ = 0;
+    /* initialize 1st half with zeros */
+    for(i=ncoef-1, dp1=mem; i-- > 0; ) *dp1++ = 0.0;
   }
-  else
+  else {
+    /* initialize 1st half with last data from previous run */
     for(i=ncoef-1, dp1=mem, sp=state; i-- > 0; ) *dp1++ = *sp++;
-
-  i = in_samps;
-  resid = 0;
+  }
 
   k = (ncoef << 1) -1;	/* inner-product loop limit */
 
-  if(skip <= 1) {       /* never used */
-/*    *out_samps = i;	
-    for( ; i-- > 0; ) {	
+  if(skip <= 1) {
+    for(i = *out_samps; i-- > 0; ) {	
       for(j=k, dp1=mem, dp2=co, dp3=mem+1, sum = 0.0; j-- > 0;
 	  *dp1++ = *dp3++ )
 	sum += *dp2++ * *dp1;
 
-      *--dp1 = *buf++;	
-      *bufo++ = (sum < 0.0)? sum -0.5 : sum +0.5; 
+      *--dp1 = *buf++;		/* new data to memory */
+      *bufo++ = (sum < 0.0)? sum -0.5f : sum +0.5f;
     }
-    if(init & 2) {	
+    if(init & 2) {
       for(i=ncoef; i-- > 0; ) {
 	for(j=k, dp1=mem, dp2=co, dp3=mem+1, sum = 0.0; j-- > 0;
 	    *dp1++ = *dp3++ )
 	  sum += *dp2++ * *dp1;
-	*--dp1 = 0.0;
-	*bufo++ = (sum < 0)? sum -0.5 : sum +0.5; 
+	*--dp1 = 0.0;		/* pad end with zeros */
+	*bufo++ = (sum < 0.0)? sum -0.5f : sum +0.5f;
       }
       *out_samps += ncoef;
     }
-    return;
-*/
-  } 
+  }
   else {			/* skip points (e.g. for downsampling) */
     /* the buffer end is padded with (ncoef-1) data points */
     for( l=0 ; l < *out_samps; l++ ) {
-      for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- >0;
+      for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- > 0;
 	  *dp1++ = *dp3++)
 	sum += *dp2++ * *dp1;
-      for(j=skip; j-- >0; *dp1++ = *buf++) /* new data to memory */
+      for(j=skip; j-- > 0; *dp1++ = *buf++) /* new data to memory */
 	sum += *dp2++ * *dp1;
-      *bufo++ = (sum<0.0) ? sum -0.5f : sum +0.5f;
+      *bufo++ = (sum < 0.0) ? sum -0.5f : sum +0.5f;
     }
     if(init & 2){
       resid = in_samps - *out_samps * skip;
       for(l=resid/skip; l-- >0; ){
-	for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- >0;
+	for(j=k-skip, dp1=mem, dp2=co, dp3=mem+skip, sum=0.0; j-- > 0;
 	    *dp1++ = *dp3++)
 	    sum += *dp2++ * *dp1;
-	for(j=skip; j-- >0; *dp1++ = 0.0)
+	for(j=skip; j-- > 0; *dp1++ = 0.0)  /* pad end with zeros */
 	  sum += *dp2++ * *dp1;
-	*bufo++ = (sum<0.0) ? sum -0.5f : sum +0.5f;
+	*bufo++ = (sum < 0.0) ? sum -0.5f : sum +0.5f;
 	(*out_samps)++;
       }
     }
-    else
-      for(dp3=buf1+idx-ncoef+1, l=ncoef-1, sp=state; l-- >0; ) *sp++ = *dp3++;
+  }
+
+  if(!(init & 2)) {	/* unless this is already the end of the signal */
+    /* keep last (ncoef-1) data points for the next initialization */
+    for(dp3=buf1+idx-ncoef+1, l=ncoef-1, sp=state; l-- > 0; ) *sp++ = *dp3++;
   }
 }
 
 /*      ----------------------------------------------------------      */
-static int lc_lin_fir(fc,nf,coef)
+static int lc_lin_fir(register float fc, int *nf, float *coef)
 /* create the coefficients for a symmetric FIR lowpass filter using the
    window technique with a Hanning window. */
-register float	fc;
-float	*coef;
-int	*nf;
 {
     register int	i, n;
     register double	twopi, fn, c;
@@ -648,9 +637,9 @@ int	*nf;
 /* ----------------------------------------------------------------------- */
 /* Use parabolic interpolation over the three points defining the peak
  * vicinity to estimate the "true" peak. */
-static void peak(y, xp, yp)
-     float *y,			/* vector of length 3 defining peak */
-       *xp, *yp;  /* x,y values of parabolic peak fitting the input points. */
+static void peak(float *y, float *xp, float *yp)
+     /* y: vector of length 3 defining peak */
+     /* xp, yp:  x,y values of parabolic peak fitting the input points. */
 {
   register float a, c;
   
@@ -760,9 +749,7 @@ static int first_time = 1, pad;
 
 /*--------------------------------------------------------------------*/
 int
-get_Nframes(buffsize, pad, step)
-    long    buffsize;
-    int     pad, step;
+get_Nframes(long buffsize, int pad, int step)
 {
   if (buffsize < pad)
     return (0);
@@ -773,10 +760,7 @@ get_Nframes(buffsize, pad, step)
 
 /*--------------------------------------------------------------------*/
 int
-init_dp_f0(freq, par, buffsize, sdstep)
-    double	freq;
-    F0_params	*par;
-    long	*buffsize, *sdstep;
+init_dp_f0(double freq, F0_params *par, long *buffsize, long *sdstep)
 {
   int nframes;
   int i;
@@ -923,20 +907,15 @@ init_dp_f0(freq, par, buffsize, sdstep)
   return(0);
 }
 
-static Stat *get_stationarity();
+static Stat *get_stationarity(float *fdata, double freq, int buff_size, int nframes, int frame_step, int first_time);
 
 /*--------------------------------------------------------------------*/
 int
-dp_f0(fdata, buff_size, sdstep, freq,
-      par, f0p_pt, vuvp_pt, rms_speech_pt, acpkp_pt, vecsize, last_time)
-    float	*fdata;
-    int		buff_size, sdstep;
-    double	freq;
-    F0_params	*par;		/* analysis control parameters */
-    float	**f0p_pt, **vuvp_pt, **rms_speech_pt, **acpkp_pt;
-    int		*vecsize, last_time;
+dp_f0(float *fdata, int buff_size, int sdstep, double freq,
+      F0_params *par, float **f0p_pt, float **vuvp_pt, float **rms_speech_pt, float **acpkp_pt, int *vecsize, int last_time)
+/* par: analysis control parameters */
 {
-  float  maxval, engref, *sta, *rms_ratio, *dsdata, *downsample();
+  float  maxval, engref, *sta, *rms_ratio, *dsdata;
   register float ttemp, ftemp, ft1, ferr, err, errmin;
   register int  i, j, k, loc1, loc2;
   int   nframes, maxloc, ncand, ncandp, minloc,
@@ -1266,8 +1245,7 @@ num_active_frames);
 
 /*--------------------------------------------------------------------*/
 Frame *
-alloc_frame(nlags, ncands)
-    int     nlags, ncands;
+alloc_frame(int nlags, int ncands)
 {
   Frame *frm;
   int j;
@@ -1304,11 +1282,7 @@ alloc_frame(nlags, ncands)
 /* push window stat to stack, and pop the oldest one */
 
 static int
-save_windstat(rho, order, err, rms)
-    float   *rho;
-    int     order;
-    float   err;
-    float   rms;
+save_windstat(float *rho, int order, float err, float rms)
 {
     int i,j;
 
@@ -1334,11 +1308,7 @@ save_windstat(rho, order, err, rms)
 
 /*--------------------------------------------------------------------*/
 static int
-retrieve_windstat(rho, order, err, rms)
-    float   *rho;
-    int     order;
-    float   *err;
-    float   *rms;
+retrieve_windstat(float *rho, int order, float *err, float *rms)
 {
     Windstat wstat;
     int i;
@@ -1356,18 +1326,11 @@ retrieve_windstat(rho, order, err, rms)
 
 /*--------------------------------------------------------------------*/
 static float
-get_similarity(order, size, pdata, cdata,
-	       rmsa, rms_ratio, pre, stab, w_type, init)
-    int     order, size;
-    float   *pdata, *cdata;
-    float   *rmsa, *rms_ratio, pre, stab;
-    int     w_type, init;
+get_similarity(int order, int size, float *pdata, float *cdata,
+	       float *rmsa, float *rms_ratio, float pre, float stab, int w_type, int init)
 {
   float rho3[BIGSORD+1], err3, rms3, rmsd3, b0, t, a2[BIGSORD+1], 
       rho1[BIGSORD+1], a1[BIGSORD+1], b[BIGSORD+1], err1, rms1, rmsd1;
-  float xitakura(), wind_energy();
-  void xa_to_aca ();
-  int xlpc();
 
 /* (In the lpc() calls below, size-1 is used, since the windowing and
    preemphasis function assumes an extra point is available in the
@@ -1440,10 +1403,7 @@ static Stat *stat = NULL;
 static float *mem = NULL;
 
 static Stat*
-get_stationarity(fdata, freq, buff_size, nframes, frame_step, first_time)
-    float   *fdata;
-    double  freq;
-    int     buff_size, nframes, frame_step, first_time;
+get_stationarity(float *fdata, double freq, int buff_size, int nframes, int frame_step, int first_time)
 {
   static int nframes_old = 0, memsize;
   float preemp = 0.4f, stab = 30.0f;
@@ -1620,7 +1580,6 @@ cGet_f0(Sound *sound, Tcl_Interp *interp, float **outlist, int *length)
   F0_params *par, *read_f0_params();
   float *f0p, *vuvp, *rms_speech, *acpkp;
   int i, vecsize;
-  int init_dp_f0(), dp_f0();
   static int framestep = -1;
   long sdstep = 0, total_samps;
   int ndone = 0;
