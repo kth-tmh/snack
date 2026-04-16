@@ -142,6 +142,10 @@ class SnackSoundFromTclTests(unittest.TestCase):
         spectrum = s.power_spectrum()
         self.assertGreater(len(power), 0)
         self.assertEqual(len(spectrum), 256)
+        self.assertAlmostEqual(power[0], 57.668, places=2)
+        self.assertAlmostEqual(power[1], 58.916, places=2)
+        self.assertAlmostEqual(spectrum[0], -27.449, places=2)
+        self.assertAlmostEqual(spectrum[1], -29.165, places=2)
 
 
 if __name__ == "__main__":

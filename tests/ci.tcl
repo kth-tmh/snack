@@ -25,13 +25,13 @@ set skipFilePatterns {audio.test mixer.test play.test record.test}
 set ::tcltest::skip {fileio-1.4 formant-* pitch-1.3 power-1.1 sound-1.3}
 
 if {[info exists ::env(SNACK_TEST_INCLUDE_FILES)]} {
-    set includeFilePatterns [split $::env(SNACK_TEST_INCLUDE_FILES)]
+    set includeFilePatterns [split $::env(SNACK_TEST_INCLUDE_FILES) " "]
 }
 if {[info exists ::env(SNACK_TEST_SKIP_FILES)]} {
-    set skipFilePatterns [split $::env(SNACK_TEST_SKIP_FILES)]
+    set skipFilePatterns [split $::env(SNACK_TEST_SKIP_FILES) " "]
 }
 if {[info exists ::env(SNACK_TEST_SKIP_TESTS)]} {
-    set ::tcltest::skip [split $::env(SNACK_TEST_SKIP_TESTS)]
+    set ::tcltest::skip [split $::env(SNACK_TEST_SKIP_TESTS) " "]
 }
 
 puts stdout "Tcl $tcl_patchLevel tests running in interp:  [info nameofexecutable]"
