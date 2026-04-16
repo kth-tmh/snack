@@ -6,10 +6,17 @@ http://www.speech.kth.se/snack/index.html
 by Kevin Russell and Kare Sjolander
 Ported to Python 3 by contributors
 
-Note: for new code, prefer the `snack` package (snack/_snack.c) which
-provides direct C bindings and does not require a Tk window.
+.. deprecated::
+    ``tkSnack`` requires a live Tk window and direct access to Tcl internals.
+    New code should use the ``snack`` package instead::
+
+        from snack import Sound, to_numpy, to_tensor
+
+    ``tkSnack`` will be removed in a future major version.  See the
+    migration guide in ``python/README.md`` for details.
 """
 
+import warnings
 import tkinter
 
 Tkroot = None
@@ -17,6 +24,13 @@ audio = None
 mixer = None
 
 def initializeSnack(newroot):
+    warnings.warn(
+        "tkSnack is deprecated and will be removed in a future major version. "
+        "Use the 'snack' package instead: from snack import Sound, to_numpy, to_tensor. "
+        "See python/README.md for a migration guide.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global Tkroot, audio, mixer
     Tkroot = newroot
     Tkroot.tk.call('eval', 'package require snack')

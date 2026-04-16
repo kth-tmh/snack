@@ -56,9 +56,24 @@ from ._snack import (
     SNACK_DOUBLE,
 )
 
+# NumPy / librosa / torchaudio interoperability helpers.
+# These imports are always available; the actual ecosystem packages are only
+# required when the individual functions are *called*.
+from .interop import (
+    to_numpy,
+    from_numpy,
+    to_librosa,
+    from_librosa,
+    librosa_load,
+    to_tensor,
+    from_tensor,
+)
+
 __all__ = [
+    # Core types
     "Sound",
     "Filter",
+    # Audio device control
     "get_output_devices",
     "get_input_devices",
     "audio_select_output",
@@ -72,6 +87,7 @@ __all__ = [
     "audio_play_gain",
     "audio_record_gain",
     "audio_play_latency",
+    # Encoding constants
     "LIN16",
     "ALAW",
     "MULAW",
@@ -81,6 +97,16 @@ __all__ = [
     "LIN32",
     "SNACK_FLOAT",
     "SNACK_DOUBLE",
+    # NumPy interop
+    "to_numpy",
+    "from_numpy",
+    # librosa interop
+    "to_librosa",
+    "from_librosa",
+    "librosa_load",
+    # torchaudio / PyTorch interop
+    "to_tensor",
+    "from_tensor",
 ]
 
 __version__ = "2.2.10"

@@ -27,6 +27,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 
+# Optional ecosystem integrations – none are required for the core API.
+[project.optional-dependencies]
+numpy = ["numpy>=1.21"]
+librosa = ["numpy>=1.21", "librosa>=0.9"]
+torch = ["numpy>=1.21", "torch>=1.10"]
+all = ["numpy>=1.21", "librosa>=0.9", "torch>=1.10"]
+dev = ["numpy>=1.21", "pytest>=7"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["snack*"]
