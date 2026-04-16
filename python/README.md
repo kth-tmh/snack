@@ -64,4 +64,4 @@ spectrum = s.dBPowerSpectrum()
 
 ## License
 
-GPL-2.0-or-later (inherited from the Snack Toolkit).
+BSD-style Snack Toolkit license; see `../LICENSE.txt`.

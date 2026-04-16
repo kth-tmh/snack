@@ -10,7 +10,9 @@
  *
  * Copyright (C) 1997-2005 Kare Sjolander
  * Python bindings copyright (C) 2024 contributors
- * GPL v2 – see LICENSE.txt
+ *
+ * This file is part of the Snack Sound Toolkit and follows the
+ * repository license terms in LICENSE.txt.
  */
 
 #define PY_SSIZE_T_CLEAN
