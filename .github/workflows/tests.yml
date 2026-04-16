@@ -23,8 +23,14 @@ jobs:
       - name: Configure and build
         working-directory: unix
         run: |
-          TCL_DIR=$(find /usr/lib /usr/local/lib -name tclConfig.sh 2>/dev/null | head -1 | xargs dirname)
-          TK_DIR=$(find /usr/lib /usr/local/lib -name tkConfig.sh 2>/dev/null | head -1 | xargs dirname)
+          TCL_CONFIG=$(find /usr/lib /usr/local/lib -name tclConfig.sh 2>/dev/null | head -1)
+          TK_CONFIG=$(find /usr/lib /usr/local/lib -name tkConfig.sh 2>/dev/null | head -1)
+          if [ -z "$TCL_CONFIG" ] || [ -z "$TK_CONFIG" ]; then
+            echo "Unable to locate tclConfig.sh/tkConfig.sh"
+            exit 1
+          fi
+          TCL_DIR=$(dirname "$TCL_CONFIG")
+          TK_DIR=$(dirname "$TK_CONFIG")
           ./configure --enable-alsa --with-tcl="$TCL_DIR" --with-tk="$TK_DIR"
           make -j"$(nproc)"
 
