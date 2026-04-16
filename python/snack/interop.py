@@ -12,7 +12,8 @@ Canonical audio data contract
                ``(frames,)`` for mono  (matching librosa convention).
 * **Dtype**  : ``numpy.float32``
 * **Range**  : ``[-1.0, 1.0]``
-* **Channel order**: left-first (same as Snack / librosa / torchaudio).
+* **Channel order**: left channel first (matches librosa and torchaudio; for
+  stereo this is ``[left, right]``).
 
 Encoding → numpy dtype mapping
 ---------------------------------

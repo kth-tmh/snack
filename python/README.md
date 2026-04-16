@@ -86,7 +86,7 @@ spectrum = s.power_spectrum()
 | Shape         | `(frames,)` for mono; `(channels, frames)` for multi-channel |
 | dtype         | `numpy.float32`                                    |
 | Range         | `[-1.0, 1.0]`                                      |
-| Channel order | left-first (matches librosa and torchaudio)        |
+| Channel order | Left channel first; for stereo: `[left, right]` (matches librosa and torchaudio) |
 
 ### Sound → NumPy
 
