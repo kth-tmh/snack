@@ -5,7 +5,16 @@ from pathlib import Path
 from snack import Sound
 
 
-FIXTURE = Path(__file__).resolve().parents[2] / "demos" / "tcl" / "ex1.wav"
+def _find_fixture() -> Path:
+    here = Path(__file__).resolve()
+    for parent in [here.parent, *here.parents]:
+        candidate = parent / "demos" / "tcl" / "ex1.wav"
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError("Unable to locate demos/tcl/ex1.wav")
+
+
+FIXTURE = _find_fixture()
 RATE_CONVERT_SAMPLE_DELTA = 2.0
 # Reference outputs from the legacy Tcl tests on ex1.wav.
 REF_POWER_0 = 57.668

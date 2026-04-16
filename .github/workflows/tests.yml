@@ -43,7 +43,12 @@ jobs:
           export DYLD_LIBRARY_PATH="$(pwd):${DYLD_LIBRARY_PATH}"
           export LIBPATH="$(pwd):${LIBPATH}"
           export SHLIB_PATH="$(pwd):${SHLIB_PATH}"
-          xvfb-run -a wish8.6 ../tests/ci.tcl
+          WISH_BIN=$(command -v wish8.6 || command -v wish)
+          if [ -z "$WISH_BIN" ]; then
+            echo "Unable to locate wish executable"
+            exit 1
+          fi
+          xvfb-run -a "$WISH_BIN" ../tests/ci.tcl
 
   python-tests:
     name: Python extension tests

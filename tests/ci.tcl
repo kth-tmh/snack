@@ -12,7 +12,7 @@
 #   SNACK_TEST_SKIP_TESTS     -> test name patterns to skip
 #
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
+if {[catch {package present tcltest}]} {
     package require tcltest
     namespace import ::tcltest::*
 }
