@@ -6,6 +6,12 @@ from snack import Sound
 
 
 FIXTURE = Path(__file__).resolve().parents[2] / "demos" / "tcl" / "ex1.wav"
+RATE_CONVERT_SAMPLE_DELTA = 2.0
+# Reference outputs from the legacy Tcl tests on ex1.wav.
+REF_POWER_0 = 57.668
+REF_POWER_1 = 58.916
+REF_SPECTRUM_0 = -27.449
+REF_SPECTRUM_1 = -29.165
 
 
 class SnackSoundFromTclTests(unittest.TestCase):
@@ -71,7 +77,7 @@ class SnackSoundFromTclTests(unittest.TestCase):
         s = Sound()
         s.read(str(FIXTURE))
         s.convert(rate=32000)
-        self.assertAlmostEqual(s.get_sample(0, 5000), 1688.0, delta=2.0)
+        self.assertAlmostEqual(s.get_sample(0, 5000), 1688.0, delta=RATE_CONVERT_SAMPLE_DELTA)
 
     def test_data_and_append_data(self):
         s = Sound()
@@ -142,10 +148,10 @@ class SnackSoundFromTclTests(unittest.TestCase):
         spectrum = s.power_spectrum()
         self.assertGreater(len(power), 0)
         self.assertEqual(len(spectrum), 256)
-        self.assertAlmostEqual(power[0], 57.668, places=2)
-        self.assertAlmostEqual(power[1], 58.916, places=2)
-        self.assertAlmostEqual(spectrum[0], -27.449, places=2)
-        self.assertAlmostEqual(spectrum[1], -29.165, places=2)
+        self.assertAlmostEqual(power[0], REF_POWER_0, places=2)
+        self.assertAlmostEqual(power[1], REF_POWER_1, places=2)
+        self.assertAlmostEqual(spectrum[0], REF_SPECTRUM_0, places=2)
+        self.assertAlmostEqual(spectrum[1], REF_SPECTRUM_1, places=2)
 
 
 if __name__ == "__main__":

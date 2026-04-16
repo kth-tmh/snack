@@ -46,8 +46,7 @@ if {[llength $includeFilePatterns] > 0} {
     puts stdout "Only sourcing test files that match:  $includeFilePatterns"
 }
 
-set timeCmd {clock format [clock seconds]}
-puts stdout "Tests began at [eval $timeCmd]"
+puts stdout "Tests began at [clock format [clock seconds]]"
 
 set selectedFiles {}
 foreach file [lsort [::tcltest::getMatchingFiles]] {
@@ -89,6 +88,6 @@ foreach file $selectedFiles {
     }
 }
 
-puts stdout "\nTests ended at [eval $timeCmd]"
+puts stdout "\nTests ended at [clock format [clock seconds]]"
 ::tcltest::cleanupTests 1
 exit
