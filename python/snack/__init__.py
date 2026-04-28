@@ -29,32 +29,37 @@ Filters::
     s.apply_filter(filt)
 """
 
-from ._snack import (
-    Sound,
-    Filter,
-    get_output_devices,
-    get_input_devices,
-    audio_select_output,
-    audio_select_input,
-    audio_frequencies,
-    audio_encodings,
-    audio_play,
-    audio_stop,
-    audio_pause,
-    audio_elapsed_time,
-    audio_play_gain,
-    audio_record_gain,
-    audio_play_latency,
-    LIN16,
-    ALAW,
-    MULAW,
-    LIN8OFFSET,
-    LIN8,
-    LIN24,
-    LIN32,
-    SNACK_FLOAT,
-    SNACK_DOUBLE,
-)
+try:
+    from ._snack import (
+        Sound,
+        Filter,
+        get_output_devices,
+        get_input_devices,
+        audio_select_output,
+        audio_select_input,
+        audio_frequencies,
+        audio_encodings,
+        audio_play,
+        audio_stop,
+        audio_pause,
+        audio_elapsed_time,
+        audio_play_gain,
+        audio_record_gain,
+        audio_play_latency,
+        LIN16,
+        ALAW,
+        MULAW,
+        LIN8OFFSET,
+        LIN8,
+        LIN24,
+        LIN32,
+        SNACK_FLOAT,
+        SNACK_DOUBLE,
+    )
+except ImportError:
+    pass
+
+from .iir import iir_filter
 
 __all__ = [
     "Sound",
@@ -81,6 +86,7 @@ __all__ = [
     "LIN32",
     "SNACK_FLOAT",
     "SNACK_DOUBLE",
+    "iir_filter",
 ]
 
 __version__ = "2.2.10"

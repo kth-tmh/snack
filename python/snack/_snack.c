@@ -19,6 +19,7 @@
 #include <Python.h>
 #include "tcl.h"
 #include "snack.h"
+#include "snack_core/snack_iir.h"
 
 /* Single embedded Tcl interpreter, initialised once at module load. */
 static Tcl_Interp *g_interp = NULL;
@@ -1326,6 +1327,169 @@ mod_audio_pause(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
+/*
+ * _parse_double_sequence — convert a Python sequence to a malloc'd double[].
+ * Returns NULL and sets a Python exception on failure.
+ * *out_len is set to the sequence length on success.
+ */
+static double *
+_parse_double_sequence(PyObject *seq, Py_ssize_t *out_len)
+{
+    PyObject *fast = PySequence_Fast(seq, "expected a sequence of floats");
+    if (!fast) return NULL;
+
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    double *arr = (double *)malloc((size_t)n * sizeof(double));
+    if (!arr) {
+        Py_DECREF(fast);
+        PyErr_NoMemory();
+        return NULL;
+    }
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = PySequence_Fast_GET_ITEM(fast, i);
+        double v = PyFloat_AsDouble(item);
+        if (v == -1.0 && PyErr_Occurred()) {
+            free(arr);
+            Py_DECREF(fast);
+            return NULL;
+        }
+        arr[i] = v;
+    }
+
+    Py_DECREF(fast);
+    *out_len = n;
+    return arr;
+}
+
+/*
+ * mod_iir_filter(x, b, a, channels=1, noise=0.0, dither=0.0, seed=1)
+ *
+ * Apply an IIR filter to a float32 buffer.
+ *
+ * x        — any buffer-protocol object holding float32 samples
+ *             (interleaved: frame0_ch0, frame0_ch1, frame1_ch0, ...)
+ * b        — sequence of numerator (feedforward) coefficients
+ * a        — sequence of denominator (feedback) coefficients; a[0] != 0
+ * channels — number of interleaved channels (default 1)
+ * noise    — amplitude of additive Gaussian noise (default 0.0)
+ * dither   — amplitude of triangular dither (default 0.0)
+ * seed     — explicit RNG seed for reproducibility (default 1)
+ *
+ * Returns a bytearray containing float32 output samples.
+ * Wrap with numpy.frombuffer(..., dtype=numpy.float32) on the Python side.
+ */
+static PyObject *
+mod_iir_filter(PyObject *Py_UNUSED(self), PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {
+        "x", "b", "a", "channels", "noise", "dither", "seed", NULL
+    };
+
+    PyObject *x_obj = NULL;
+    PyObject *b_obj = NULL;
+    PyObject *a_obj = NULL;
+    int       channels   = 1;
+    double    noise_sc   = 0.0;
+    double    dither_sc  = 0.0;
+    unsigned long seed   = 1;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOO|iddK", kwlist,
+                                     &x_obj, &b_obj, &a_obj,
+                                     &channels, &noise_sc, &dither_sc,
+                                     &seed))
+        return NULL;
+
+    if (channels < 1) {
+        PyErr_SetString(PyExc_ValueError, "channels must be >= 1");
+        return NULL;
+    }
+
+    /* Acquire read-only buffer view of x (accepts numpy arrays, bytes, etc.) */
+    Py_buffer x_view;
+    if (PyObject_GetBuffer(x_obj, &x_view, PyBUF_C_CONTIGUOUS | PyBUF_FORMAT) < 0)
+        return NULL;
+
+    /* Check that the element size matches float32 */
+    if (x_view.itemsize != sizeof(float)) {
+        PyBuffer_Release(&x_view);
+        PyErr_Format(PyExc_TypeError,
+                     "x must contain float32 data (itemsize=4), got itemsize=%zd",
+                     x_view.itemsize);
+        return NULL;
+    }
+
+    Py_ssize_t n_samples = x_view.len / (Py_ssize_t)sizeof(float);
+    if (n_samples % channels != 0) {
+        PyBuffer_Release(&x_view);
+        PyErr_Format(PyExc_ValueError,
+                     "x length (%zd samples) is not a multiple of channels (%d)",
+                     n_samples, channels);
+        return NULL;
+    }
+    int n_frames = (int)(n_samples / channels);
+
+    /* Parse coefficient sequences. */
+    Py_ssize_t n_b = 0, n_a = 0;
+    double *b = _parse_double_sequence(b_obj, &n_b);
+    if (!b) { PyBuffer_Release(&x_view); return NULL; }
+
+    double *a = _parse_double_sequence(a_obj, &n_a);
+    if (!a) { free(b); PyBuffer_Release(&x_view); return NULL; }
+
+    if (n_b < 1 || n_a < 1) {
+        PyErr_SetString(PyExc_ValueError, "b and a must each have at least one element");
+        free(b); free(a);
+        PyBuffer_Release(&x_view);
+        return NULL;
+    }
+    if (a[0] == 0.0) {
+        PyErr_SetString(PyExc_ValueError, "a[0] must be non-zero");
+        free(b); free(a);
+        PyBuffer_Release(&x_view);
+        return NULL;
+    }
+
+    /* Initialise the filter state. */
+    SnackIIRState st;
+    if (snack_iir_init(&st, (int)n_b, b, (int)n_a, a, channels) != 0) {
+        free(b); free(a);
+        PyBuffer_Release(&x_view);
+        PyErr_SetString(PyExc_RuntimeError, "snack_iir_init failed");
+        return NULL;
+    }
+    free(b);
+    free(a);
+    snack_iir_seed(&st, (uint32_t)seed);
+
+    /* Allocate output buffer. */
+    Py_ssize_t out_bytes = n_samples * (Py_ssize_t)sizeof(float);
+    PyObject *out_ba = PyByteArray_FromStringAndSize(NULL, out_bytes);
+    if (!out_ba) {
+        snack_iir_free(&st);
+        PyBuffer_Release(&x_view);
+        return NULL;
+    }
+
+    /* Run the filter. */
+    const float *in_ptr  = (const float *)x_view.buf;
+    float       *out_ptr = (float *)PyByteArray_AS_STRING(out_ba);
+
+    int rc = snack_iir_process_f32(&st, in_ptr, out_ptr,
+                                   n_frames, noise_sc, dither_sc);
+
+    snack_iir_free(&st);
+    PyBuffer_Release(&x_view);
+
+    if (rc != 0) {
+        Py_DECREF(out_ba);
+        PyErr_SetString(PyExc_RuntimeError, "snack_iir_process_f32 failed");
+        return NULL;
+    }
+
+    return out_ba;
+}
+
 static PyMethodDef snack_methods[] = {
     /* Device enumeration */
     {"get_output_devices", mod_get_output_devices, METH_NOARGS,
@@ -1361,6 +1525,23 @@ static PyMethodDef snack_methods[] = {
      "audio_play_latency(ms=None) -> int\n\n"
      "Get or set how much audio (in milliseconds) is buffered to the device.\n"
      "Returns the current latency."},
+    {"iir_filter",         mod_iir_filter,         METH_VARARGS | METH_KEYWORDS,
+     "iir_filter(x, b, a, channels=1, noise=0.0, dither=0.0, seed=1) -> bytearray\n\n"
+     "Apply an IIR filter to float32 samples.\n\n"
+     "x must be a buffer-protocol object (e.g. numpy float32 array) whose\n"
+     "length is n_frames * channels.  Returns a bytearray of the same size\n"
+     "containing float32 output samples.\n\n"
+     "Use numpy.frombuffer(result, dtype=numpy.float32) to obtain a\n"
+     "NumPy array without an extra copy.\n\n"
+     "Parameters\n"
+     "----------\n"
+     "x        : buffer of float32, shape (n_frames * channels,)\n"
+     "b        : sequence of float — numerator coefficients\n"
+     "a        : sequence of float — denominator coefficients (a[0] != 0)\n"
+     "channels : int — number of interleaved channels (default 1)\n"
+     "noise    : float — Gaussian noise amplitude (default 0.0)\n"
+     "dither   : float — triangular dither amplitude (default 0.0)\n"
+     "seed     : int  — RNG seed for reproducible stochastic output (default 1)"},
     {NULL, NULL, 0, NULL}
 };
 

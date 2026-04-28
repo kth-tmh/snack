@@ -47,6 +47,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 /* Private stuff */
 
@@ -75,6 +76,7 @@ typedef struct iirFilter {
   int in, out;		/* current position in histories */
   double *inputs;		/* input history for numerator */
   double *outputs;		/* output history for denominator */
+  uint32_t rng;		/* explicit xorshift32 RNG state (never 0) */
 } iirFilter, *iirFilter_t;
 
 /*
@@ -162,6 +164,7 @@ iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
 	return TCL_ERROR;
       }
       
+      if (iir->itaps != NULL) ckfree((void *) iir->itaps);
       iir->nInTaps = n;
       iir->itaps = (double *) ckalloc( n * sizeof(iir->itaps[0]) );
       
@@ -179,6 +182,7 @@ iirConfigProc(Snack_Filter f, Tcl_Interp *interp, int objc,
 	return TCL_ERROR;
       }
       
+      if (iir->otaps != NULL) ckfree((void *) iir->otaps);
       iir->nOutTaps = n;
       iir->otaps = (double *) ckalloc( n * sizeof(iir->otaps[0]) );
       
@@ -220,9 +224,11 @@ iirCreateProc(Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[])
   memset(iir, 0, sizeof(*iir));
   
   /* default values set before calling the config */
-  iir->dither = 0.75;
+  iir->dither = 0.0;
+  iir->noise = 0.0;
   iir->nInTaps = 0;
   iir->nOutTaps = 0;
+  iir->rng = 1u; /* xorshift32 must not be 0 */
   
   if (iirConfigProc((Snack_Filter) iir, interp, objc, objv) != TCL_OK) {
     ckfree((char *) iir);
@@ -254,6 +260,7 @@ iirStartProc(Snack_Filter f, Snack_StreamInfo si)
   iirFilter_t iir = (iirFilter_t) f;
   
   if (iir->nInTaps > 0) {
+    if (iir->inputs != NULL) ckfree((void *) iir->inputs);
     iir->inputs = (double *) ckalloc(si->outWidth * 
 				     iir->nInTaps * sizeof(iir->inputs[0]));
     for (i = 0; i < iir->nInTaps * si->outWidth; i++ ) {
@@ -261,6 +268,7 @@ iirStartProc(Snack_Filter f, Snack_StreamInfo si)
     }
   }
   if (iir->nOutTaps > 0) {
+    if (iir->outputs != NULL) ckfree((void *) iir->outputs);
     iir->outputs = (double *) ckalloc(si->outWidth * 
 				      iir->nOutTaps * sizeof(iir->outputs[0]));
     for (i = 0; i < iir->nOutTaps * si->outWidth; i++ ) {
@@ -291,40 +299,59 @@ iirStartProc(Snack_Filter f, Snack_StreamInfo si)
  * 
  */
 
-static double
-xdrand48()
+/*
+ * xorshift32 -- Advance an explicit 32-bit xorshift RNG and return the
+ * 	new state.  The state must never be 0.
+ */
+static uint32_t
+xorshift32(uint32_t *state)
 {
-  return((double)rand()/RAND_MAX);
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+    return x;
 }
 
 static double
-normalDeviate()
+iirRandUniform(uint32_t *state)
 {
-  return
-    xdrand48() + xdrand48() - xdrand48() - xdrand48() +
-    xdrand48() + xdrand48() - xdrand48() - xdrand48() +
-    xdrand48() + xdrand48() - xdrand48() - xdrand48();
+    return (double)xorshift32(state) / (double)0xFFFFFFFFu;
 }
 
 /*
- * triangularDeviate -- Return a triangular dither sample.  Adding a
+ * iirNormalDeviate -- Return a unit normal deviate using the
+ * 	12-uniform-sum method.  Mean 0, variance 1.
+ * 	Uses an explicit RNG state so results are reproducible.
+ */
+static double
+iirNormalDeviate(uint32_t *state)
+{
+    double s = 0.0;
+    int k;
+    for (k = 0; k < 6; k++) {
+        s += iirRandUniform(state);
+        s -= iirRandUniform(state);
+    }
+    return s;
+}
+
+/*
+ * iirTriangularDeviate -- Return a triangular dither sample.  Adding a
  * 	dither signal from a triangular distribution converts highly
  * 	correlated quantization noise into uncorrelated white noise
  * 	that is generally considered to be less perceptible.
  * 	Theoretically, 1LSB is the optimal size, but in practice,
  * 	somewhat less is actually used.
- * 	
- * Arguments:
  *
  * Returns:
  * A random value from a unit sized triangular distribution.
- * 
  */
-
 static double
-triangularDeviate()
+iirTriangularDeviate(uint32_t *state)
 {
-    return xdrand48() - xdrand48();
+    return iirRandUniform(state) - iirRandUniform(state);
 }
 
 /*
@@ -373,12 +400,12 @@ iirFlowProc(Snack_Filter f, Snack_StreamInfo si, float *in, float *out,
     for (i = 0; i < *inFrames && i < *outFrames; i++) {
       /* get value and cast to a very safe working copy */
       insmp = (double) in[i*si->outWidth+wi];
-      iir->inputs[iir_in*si->outWidth+wi] = insmp;
       
       /* output is initially zero.  We add up the contribution for
 	 the input history elements */
       outsmp = 0;
       if (iir->itaps != NULL) {
+	iir->inputs[iir_in*si->outWidth+wi] = insmp;
 	/* this is the inner convolution loop.  We should unroll
 	   this or something if we care about speed.  Of course,
 	   we don't care until we know that the code really works!	   
@@ -420,7 +447,7 @@ iirFlowProc(Snack_Filter f, Snack_StreamInfo si, float *in, float *out,
 	/* note that we skip the 0'th element here */
 	for (j = 1 ; j < iir->nOutTaps ; j++) {
 	  outsmp -= iir->otaps[j] * iir->outputs[k*si->outWidth+wi];
-	  k = (k+1)%(iir->nInTaps);
+	  k = (k+1)%(iir->nOutTaps);
 	}
 	iir_out = (iir_out+1)%(iir->nOutTaps);
 	
@@ -428,8 +455,8 @@ iirFlowProc(Snack_Filter f, Snack_StreamInfo si, float *in, float *out,
 	outsmp /= iir->otaps[0];
 	iir->outputs[iir_out*si->outWidth+wi] = outsmp;
       } 
-      out[i*si->outWidth+wi] = (float) (outsmp + iir->noise * normalDeviate()
-					+ iir->dither * triangularDeviate());
+      out[i*si->outWidth+wi] = (float) (outsmp + iir->noise * iirNormalDeviate(&iir->rng)
+					+ iir->dither * iirTriangularDeviate(&iir->rng));
     }
   }
   iir->in = iir_in;
