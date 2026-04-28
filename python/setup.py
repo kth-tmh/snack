@@ -160,6 +160,7 @@ try:
         os.path.join(GENERIC, "sigproc2.c"),
         os.path.join(GENERIC, "g711.c"),
         os.path.join(GENERIC, "snackStubInit.c"),
+        os.path.join(GENERIC, "snack_core", "snack_iir.c"),
         audio_src,
     ]
 
